@@ -118,4 +118,8 @@ export class UsersService {
       message: 'Xóa người dùng thành công',
     };
   }
+
+  async findByEmail(email: string) {
+    return this.userModel.findOne({ email });
+  }
 }

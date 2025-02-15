@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UsersModule } from '@/modules/users/users.module';
 import { AppService } from '@/app.service';
-import { RoomsModule } from './modules/rooms/rooms.module';
-import { RoomBedTypesModule } from './modules/room.bed_types/room.bed_types.module';
-import { RoomStatusesModule } from './modules/room.statuses/room.statuses.module';
-import { RoomFloorsModule } from './modules/room.floors/room.floors.module';
-import { RoomFacilitiesModule } from './modules/room.facilities/room.facilities.module';
+import { RoomsModule } from '@/modules/rooms/rooms.module';
+import { RoomBedTypesModule } from '@/modules/room.bed_types/room.bed_types.module';
+import { RoomStatusesModule } from '@/modules/room.statuses/room.statuses.module';
+import { RoomFloorsModule } from '@/modules/room.floors/room.floors.module';
+import { RoomFacilitiesModule } from '@/modules/room.facilities/room.facilities.module';
+import { AuthModule } from '@/auth/auth.module';
+import { AppController } from '@/app.controller';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { RoomFacilitiesModule } from './modules/room.facilities/room.facilities.
     RoomStatusesModule,
     RoomFloorsModule,
     RoomFacilitiesModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
