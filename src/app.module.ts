@@ -10,6 +10,8 @@ import { RoomFloorsModule } from '@/modules/room.floors/room.floors.module';
 import { RoomFacilitiesModule } from '@/modules/room.facilities/room.facilities.module';
 import { AuthModule } from '@/auth/auth.module';
 import { AppController } from '@/app.controller';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from '@/auth/passport/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -30,6 +32,12 @@ import { AppController } from '@/app.controller';
     AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}
