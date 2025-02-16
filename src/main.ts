@@ -17,18 +17,12 @@ async function bootstrap() {
                 error.constraints[key] ===
                 `property ${error.property} should not exist`
               ) {
-                return {
-                  property: error.property,
-                  message: `Trường '${error.property}' không được phép tồn tại.`,
-                };
+                return `Trường '${error.property}' không được phép tồn tại.`;
               }
             }
           }
 
-          return {
-            property: error.property,
-            message: Object.values(error.constraints ?? {}).join(', '),
-          };
+          return Object.values(error.constraints ?? {}).join(', ');
         });
 
         return new BadRequestException(customErrors);

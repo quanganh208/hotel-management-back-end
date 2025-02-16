@@ -10,6 +10,8 @@ import { User } from '@/modules/users/schemas/user.schema';
 import { Model, SortOrder, Types } from 'mongoose';
 import { hashPassword } from '@/helpers/util';
 import aqp from 'api-query-params';
+import { RegisterDto } from '@/auth/dto/register.dto';
+import * as dayjs from 'dayjs';
 
 @Injectable()
 export class UsersService {
@@ -121,5 +123,19 @@ export class UsersService {
 
   async findByEmail(email: string) {
     return this.userModel.findOne({ email });
+  }
+
+  async register(registerDto: RegisterDto) {
+    await this.checkUserExists(registerDto.email);
+    const hashedPassword = await hashPassword(registerDto.password);
+    await new this.userModel({
+      ...registerDto,
+      password: hashedPassword,
+      isVerified: false,
+      verificationCode: Math.floor(10000000 + Math.random() * 90000000),
+      codeExpires: dayjs().add(1, 'hours'),
+    }).save();
+
+    return true;
   }
 }

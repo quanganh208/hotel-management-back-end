@@ -4,12 +4,15 @@ import { comparePasswords } from '@/helpers/util';
 import { JwtService } from '@nestjs/jwt';
 import * as process from 'node:process';
 import { UserDocument } from '@/modules/users/schemas/user.schema';
+import { RegisterDto } from '@/auth/dto/register.dto';
+import { MailerService } from '@nestjs-modules/mailer';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private usersService: UsersService,
-    private jwtService: JwtService,
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
+    private readonly mailerService: MailerService,
   ) {}
 
   async validateUser(
@@ -33,6 +36,19 @@ export class AuthService {
       email: user.email,
       accountType: user.accountType,
       image: user.image,
+    };
+  }
+
+  async register(registerDto: RegisterDto) {
+    // const user = await this.usersService.create(registerDto);
+    await this.mailerService.sendMail({
+      to: registerDto.email,
+      subject: 'Xác nhận tài khoản',
+      text: 'Xác nhận tài khoản',
+    });
+    return {
+      message:
+        'Đăng ký tài khoản thành công, vui lòng kiểm tra email để xác nhận tài khoản',
     };
   }
 }
