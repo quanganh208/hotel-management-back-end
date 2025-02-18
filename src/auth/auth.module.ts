@@ -7,7 +7,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { LocalStrategy } from '@/auth/passport/local.strategy';
 import { JwtStrategy } from '@/auth/passport/jwt.strategy';
-import { MailerModule } from '@nestjs-modules/mailer';
 
 @Module({
   imports: [
@@ -20,33 +19,6 @@ import { MailerModule } from '@nestjs-modules/mailer';
         signOptions: {
           expiresIn: configService.get<string>('JWT_EXPIRES_IN'),
         },
-      }),
-      inject: [ConfigService],
-    }),
-    MailerModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        transport: {
-          service: 'gmail',
-          host: 'smtp.gmail.com',
-          ignoreTLS: true,
-          secure: false,
-          auth: {
-            user: configService.get<string>('MAILDEV_INCOMING_USER'),
-            pass: configService.get<string>('MAILDEV_INCOMING_PASS'),
-          },
-        },
-        defaults: {
-          from: '"No Reply" <no-reply@localhost>',
-        },
-        // preview: true,
-        // template: {
-        //   dir: process.cwd() + '/template/',
-        //   adapter: new HandlebarsAdapter(), // or new PugAdapter() or new EjsAdapter()
-        //   options: {
-        //     strict: true,
-        //   },
-        // },
       }),
       inject: [ConfigService],
     }),
