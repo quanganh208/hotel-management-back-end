@@ -13,6 +13,7 @@ import aqp from 'api-query-params';
 import { RegisterDto } from '@/auth/dto/register.dto';
 import * as dayjs from 'dayjs';
 import { MailerService } from '@nestjs-modules/mailer';
+import { ActivateAccountDto } from '@/auth/dto/activate-account.dto';
 
 @Injectable()
 export class UsersService {
@@ -154,6 +155,37 @@ export class UsersService {
     return {
       message:
         'Đăng ký tài khoản thành công, vui lòng kiểm tra email để xác thực tài khoản',
+    };
+  }
+
+  async activateAccount(activateAccountDto: ActivateAccountDto) {
+    const { email, verificationCode } = activateAccountDto;
+    const user = await this.userModel.findOne({ email });
+
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy người dùng với email này');
+    }
+
+    if (user.isVerified) {
+      throw new BadRequestException('Tài khoản đã được kích hoạt trước đó');
+    }
+
+    if (user.verificationCode !== verificationCode) {
+      throw new BadRequestException('Mã xác thực không chính xác');
+    }
+
+    if (dayjs().isAfter(user.codeExpires)) {
+      throw new BadRequestException('Mã xác thực đã hết hạn');
+    }
+
+    await user.updateOne({
+      isVerified: true,
+      verificationCode: null,
+      codeExpires: null,
+    });
+
+    return {
+      message: 'Kích hoạt tài khoản thành công',
     };
   }
 }
