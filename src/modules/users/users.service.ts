@@ -12,15 +12,11 @@ import { hashPassword } from '@/helpers/util';
 import aqp from 'api-query-params';
 import { RegisterDto } from '@/auth/dto/register.dto';
 import * as dayjs from 'dayjs';
-import { MailerService } from '@nestjs-modules/mailer';
 import { ActivateAccountDto } from '@/auth/dto/activate-account.dto';
 
 @Injectable()
 export class UsersService {
-  constructor(
-    @InjectModel(User.name) private userModel: Model<User>,
-    private readonly mailerService: MailerService,
-  ) {}
+  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
 
   private async checkUserExists(
     email?: string,
@@ -141,20 +137,8 @@ export class UsersService {
       verificationCode: verificationCode,
       codeExpires: dayjs().add(1, 'hours'),
     }).save();
-
-    await this.mailerService.sendMail({
-      to: registerDto.email,
-      subject: 'Kích hoạt tài khoản của bạn tại website Hotel Management',
-      template: 'register',
-      context: {
-        name: registerDto.name,
-        code: verificationCode,
-        year: new Date().getFullYear(),
-      },
-    });
     return {
-      message:
-        'Đăng ký tài khoản thành công, vui lòng kiểm tra email để xác thực tài khoản',
+      message: 'Đăng ký tài khoản thành công',
     };
   }
 

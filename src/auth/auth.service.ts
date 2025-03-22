@@ -6,7 +6,7 @@ import * as process from 'node:process';
 import { UserDocument } from '@/modules/users/schemas/user.schema';
 import { RegisterDto } from '@/auth/dto/register.dto';
 import { ActivateAccountDto } from './dto/activate-account.dto';
-import { ResendActivationDto } from './dto/resend-activation.dto';
+import { SendActivationDto } from './dto/send-activation.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import * as dayjs from 'dayjs';
@@ -52,8 +52,8 @@ export class AuthService {
     return await this.usersService.activateAccount(activateAccountDto);
   }
 
-  async resendActivation(resendActivationDto: ResendActivationDto) {
-    const user = await this.usersService.findByEmail(resendActivationDto.email);
+  async sendActivation(sendActivationDto: SendActivationDto) {
+    const user = await this.usersService.findByEmail(sendActivationDto.email);
 
     if (!user) {
       throw new BadRequestException('Email không tồn tại trong hệ thống');
@@ -81,7 +81,7 @@ export class AuthService {
     });
 
     return {
-      message: 'Mã kích hoạt mới đã được gửi đến email của bạn',
+      message: 'Mã kích hoạt đã được gửi đến email của bạn',
     };
   }
 
@@ -142,39 +142,6 @@ export class AuthService {
 
     return {
       message: 'Đặt lại mật khẩu thành công',
-    };
-  }
-
-  async resendForgotPassword(forgotPasswordDto: ForgotPasswordDto) {
-    const user = await this.usersService.findByEmail(forgotPasswordDto.email);
-
-    if (!user) {
-      throw new BadRequestException('Email không tồn tại trong hệ thống');
-    }
-
-    if (!user.verificationCode || !user.codeExpires) {
-      throw new BadRequestException('Bạn chưa yêu cầu đặt lại mật khẩu');
-    }
-
-    const verificationCode = Math.floor(10000000 + Math.random() * 90000000);
-    await user.updateOne({
-      verificationCode: verificationCode,
-      codeExpires: dayjs().add(1, 'hours'),
-    });
-
-    await this.mailerService.sendMail({
-      to: user.email,
-      subject: 'Đặt lại mật khẩu tại website Hotel Management',
-      template: 'forgot-password',
-      context: {
-        name: user.name,
-        code: verificationCode,
-        year: new Date().getFullYear(),
-      },
-    });
-
-    return {
-      message: 'Mã xác thực mới đã được gửi đến email của bạn',
     };
   }
 }

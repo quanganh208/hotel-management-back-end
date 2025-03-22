@@ -31,6 +31,7 @@ async function bootstrap() {
   );
 
   app.setGlobalPrefix('api', { exclude: [''] });
+  app.enableCors();
   await app.listen(process.env.PORT ?? 8000);
 }
 

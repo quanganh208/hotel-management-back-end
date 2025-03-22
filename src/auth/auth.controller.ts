@@ -6,9 +6,9 @@ import { UserDocument } from '@/modules/users/schemas/user.schema';
 import { Public } from '@/decorator/customize';
 import { RegisterDto } from '@/auth/dto/register.dto';
 import { ActivateAccountDto } from './dto/activate-account.dto';
-import { ResendActivationDto } from './dto/resend-activation.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SendActivationDto } from '@/auth/dto/send-activation.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -33,10 +33,10 @@ export class AuthController {
     return this.authService.activate(activateAccountDto);
   }
 
-  @Post('resend-activation')
+  @Post('send-activation')
   @Public()
-  resendActivation(@Body() resendActivationDto: ResendActivationDto) {
-    return this.authService.resendActivation(resendActivationDto);
+  resendActivation(@Body() sendActivationDto: SendActivationDto) {
+    return this.authService.sendActivation(sendActivationDto);
   }
 
   @Post('forgot-password')
@@ -49,11 +49,5 @@ export class AuthController {
   @Public()
   resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
-  }
-
-  @Post('resend-forgot-password')
-  @Public()
-  resendForgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
-    return this.authService.resendForgotPassword(forgotPasswordDto);
   }
 }
