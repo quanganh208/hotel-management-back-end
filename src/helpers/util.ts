@@ -1,4 +1,5 @@
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 const saltRounds: number = 10;
 
@@ -12,4 +13,8 @@ export const comparePasswords = async (
   hashedPassword: string,
 ): Promise<boolean> => {
   return await bcrypt.compare(plainPassword, hashedPassword);
+};
+
+export const generateResetToken = (): string => {
+  return crypto.randomBytes(32).toString('hex');
 };

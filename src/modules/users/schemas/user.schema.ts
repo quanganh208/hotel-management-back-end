@@ -28,6 +28,9 @@ export class User {
 
   @Prop()
   codeExpires: Date;
+
+  @Prop()
+  resetToken: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

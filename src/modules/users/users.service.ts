@@ -126,6 +126,15 @@ export class UsersService {
     return this.userModel.findOne({ email });
   }
 
+  async findById(id: string) {
+    this.validateMongoId(id);
+    return this.userModel.findById(id);
+  }
+
+  async findByResetToken(resetToken: string) {
+    return this.userModel.findOne({ resetToken });
+  }
+
   async register(registerDto: RegisterDto) {
     await this.checkUserExists(registerDto.email);
     const hashedPassword = await hashPassword(registerDto.password);

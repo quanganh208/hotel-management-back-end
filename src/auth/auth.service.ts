@@ -1,6 +1,10 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { UsersService } from '@/modules/users/users.service';
-import { comparePasswords, hashPassword } from '@/helpers/util';
+import {
+  comparePasswords,
+  hashPassword,
+  generateResetToken,
+} from '@/helpers/util';
 import { JwtService } from '@nestjs/jwt';
 import * as process from 'node:process';
 import { UserDocument } from '@/modules/users/schemas/user.schema';
@@ -11,6 +15,17 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import * as dayjs from 'dayjs';
 import { MailerService } from '@nestjs-modules/mailer';
+
+interface JwtPayload {
+  sub: string;
+
+  [key: string]: any;
+}
+
+interface TokenError {
+  name: string;
+  message: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -63,11 +78,21 @@ export class AuthService {
       throw new BadRequestException('Tài khoản đã được kích hoạt trước đó');
     }
 
-    const verificationCode = Math.floor(10000000 + Math.random() * 90000000);
-    await user.updateOne({
-      verificationCode: verificationCode,
-      codeExpires: dayjs().add(1, 'hours'),
-    });
+    let verificationCode;
+
+    if (
+      user.verificationCode &&
+      user.codeExpires &&
+      dayjs().isBefore(dayjs(user.codeExpires))
+    ) {
+      verificationCode = user.verificationCode;
+    } else {
+      verificationCode = Math.floor(10000000 + Math.random() * 90000000);
+      await user.updateOne({
+        verificationCode: verificationCode,
+        codeExpires: dayjs().add(1, 'hours').toDate(),
+      });
+    }
 
     await this.mailerService.sendMail({
       to: user.email,
@@ -75,7 +100,7 @@ export class AuthService {
       template: 'register',
       context: {
         name: user.name,
-        code: verificationCode,
+        code: verificationCode as number,
         year: new Date().getFullYear(),
       },
     });
@@ -92,11 +117,14 @@ export class AuthService {
       throw new BadRequestException('Email không tồn tại trong hệ thống');
     }
 
-    const verificationCode = Math.floor(10000000 + Math.random() * 90000000);
+    const resetToken = generateResetToken();
+
     await user.updateOne({
-      verificationCode: verificationCode,
-      codeExpires: dayjs().add(1, 'hours'),
+      resetToken: resetToken,
+      codeExpires: dayjs().add(1, 'hours').toDate(),
     });
+
+    const resetUrl = `${process.env.FRONTEND_URL}/auth/reset-password?token=${resetToken}`;
 
     await this.mailerService.sendMail({
       to: user.email,
@@ -104,44 +132,46 @@ export class AuthService {
       template: 'forgot-password',
       context: {
         name: user.name,
-        code: verificationCode,
+        resetUrl: resetUrl,
         year: new Date().getFullYear(),
       },
     });
 
     return {
-      message: 'Mã xác thực đã được gửi đến email của bạn',
+      message: 'Liên kết đặt lại mật khẩu đã được gửi đến email của bạn',
     };
   }
 
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
-    const user = await this.usersService.findByEmail(resetPasswordDto.email);
+    try {
+      const user = await this.usersService.findByResetToken(
+        resetPasswordDto.token,
+      );
 
-    if (!user) {
-      throw new BadRequestException('Email không tồn tại trong hệ thống');
+      if (!user) {
+        throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn');
+      }
+
+      if (!user.codeExpires || dayjs().isAfter(dayjs(user.codeExpires))) {
+        throw new BadRequestException('Token đã hết hạn');
+      }
+
+      const hashedPassword = await hashPassword(resetPasswordDto.newPassword);
+
+      await user.updateOne({
+        password: hashedPassword,
+        resetToken: null,
+        codeExpires: null,
+      });
+
+      return {
+        message: 'Mật khẩu đã được đặt lại thành công',
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Lỗi khi đặt lại mật khẩu');
     }
-
-    if (!user.verificationCode || !user.codeExpires) {
-      throw new BadRequestException('Bạn chưa yêu cầu đặt lại mật khẩu');
-    }
-
-    if (user.verificationCode !== resetPasswordDto.verificationCode) {
-      throw new BadRequestException('Mã xác thực không chính xác');
-    }
-
-    if (dayjs().isAfter(user.codeExpires)) {
-      throw new BadRequestException('Mã xác thực đã hết hạn');
-    }
-
-    const hashedPassword = await hashPassword(resetPasswordDto.newPassword);
-    await user.updateOne({
-      password: hashedPassword,
-      verificationCode: null,
-      codeExpires: null,
-    });
-
-    return {
-      message: 'Đặt lại mật khẩu thành công',
-    };
   }
 }
