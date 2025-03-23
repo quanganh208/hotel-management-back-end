@@ -6,13 +6,20 @@ import {
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { User } from '@/modules/users/schemas/user.schema';
+import { User, UserDocument } from '@/modules/users/schemas/user.schema';
 import { Model, SortOrder, Types } from 'mongoose';
 import { hashPassword } from '@/helpers/util';
 import aqp from 'api-query-params';
 import { RegisterDto } from '@/auth/dto/register.dto';
 import * as dayjs from 'dayjs';
 import { ActivateAccountDto } from '@/auth/dto/activate-account.dto';
+
+interface GoogleUserData {
+  email: string;
+  name: string;
+  googleId: string;
+  image?: string;
+}
 
 @Injectable()
 export class UsersService {
@@ -133,6 +140,26 @@ export class UsersService {
 
   async findByResetToken(resetToken: string) {
     return this.userModel.findOne({ resetToken });
+  }
+
+  async createGoogleUser(userData: GoogleUserData): Promise<UserDocument> {
+    // Kiểm tra xem email đã tồn tại chưa
+    const existingUser = await this.userModel.findOne({
+      email: userData.email,
+    });
+    if (existingUser) {
+      throw new BadRequestException('Email đã tồn tại trong hệ thống');
+    }
+
+    // Tạo người dùng mới với thông tin từ Google
+    return await new this.userModel({
+      email: userData.email,
+      name: userData.name,
+      googleId: userData.googleId,
+      image: userData.image,
+      accountType: 'GOOGLE',
+      isVerified: true, // Tài khoản Google được xem là đã xác thực
+    }).save();
   }
 
   async register(registerDto: RegisterDto) {

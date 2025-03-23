@@ -17,6 +17,9 @@ export class User {
   @Prop()
   image: string;
 
+  @Prop()
+  googleId: string;
+
   @Prop({ default: 'LOCAL' })
   accountType: string;
 

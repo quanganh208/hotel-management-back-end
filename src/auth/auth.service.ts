@@ -13,8 +13,10 @@ import { ActivateAccountDto } from './dto/activate-account.dto';
 import { SendActivationDto } from './dto/send-activation.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { GoogleAuthDto } from './dto/google-auth.dto';
 import * as dayjs from 'dayjs';
 import { MailerService } from '@nestjs-modules/mailer';
+import { OAuth2Client } from 'google-auth-library';
 
 @Injectable()
 export class AuthService {
@@ -161,6 +163,91 @@ export class AuthService {
         throw error;
       }
       throw new BadRequestException('Lỗi khi đặt lại mật khẩu');
+    }
+  }
+
+  async googleAuth(googleAuthDto: GoogleAuthDto) {
+    try {
+      // Xác thực ID token từ Google
+      const ticket = await this.verifyGoogleIdToken(googleAuthDto.idToken);
+
+      if (!ticket) {
+        return new BadRequestException('Google ID token không hợp lệ');
+      }
+
+      const payload = ticket.getPayload();
+
+      if (!payload) {
+        return new BadRequestException(
+          'Không thể lấy thông tin từ Google ID token',
+        );
+      }
+
+      const { email, name, sub: googleId, picture: image } = payload;
+
+      if (!email) {
+        return new BadRequestException('Email không được cung cấp từ Google');
+      }
+
+      // Tìm người dùng theo email
+      const existingUser = await this.usersService.findByEmail(email);
+
+      if (existingUser) {
+        // Cập nhật thông tin Google nếu tài khoản đã tồn tại
+        if (existingUser.accountType === 'GOOGLE') {
+          // Cập nhật thông tin Google nếu cần
+          if (
+            existingUser.googleId !== googleId ||
+            existingUser.name !== name ||
+            existingUser.image !== image
+          ) {
+            await existingUser.updateOne({
+              googleId: googleId,
+              name: name,
+              image: image,
+            });
+          }
+        } else {
+          // Nếu tài khoản đăng ký bằng email/mật khẩu, liên kết với Google
+          await existingUser.updateOne({
+            googleId: googleId,
+            // Không cập nhật tên để giữ tên người dùng đã chọn khi đăng ký
+            image: existingUser.image || image, // Giữ ảnh hiện tại nếu có, nếu không thì dùng ảnh Google
+          });
+        }
+
+        // Đăng nhập người dùng
+        return this.login(existingUser);
+      } else {
+        // Tạo tài khoản mới với thông tin Google
+        const newUser = await this.usersService.createGoogleUser({
+          email,
+          name: name || '',
+          googleId,
+          image,
+        });
+
+        // Đăng nhập người dùng mới
+        return this.login(newUser);
+      }
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Lỗi khi xử lý đăng nhập với Google');
+    }
+  }
+
+  private async verifyGoogleIdToken(idToken: string) {
+    try {
+      const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+      return await client.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+    } catch (error) {
+      console.error('Lỗi xác thực Google ID token:', error);
+      return null;
     }
   }
 }
