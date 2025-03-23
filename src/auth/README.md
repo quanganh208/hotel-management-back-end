@@ -59,15 +59,14 @@ Hệ thống hỗ trợ liên kết tài khoản giữa đăng nhập thông th�
 
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "Bearer",
-  "user": {
-    "_id": "60a1b2c3d4e5f6a7b8c9d0e1",
-    "email": "user@example.com",
-    "name": "User Name",
-    "accountType": "GOOGLE" // hoặc "LOCAL" nếu đăng ký bằng email/password
-    // Các thông tin khác
-  }
+   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+   "token_type": "Bearer",
+   "user": {
+      "_id": "60a1b2c3d4e5f6a7b8c9d0e1",
+      "email": "user@example.com",
+      "name": "User Name",
+      "accountType": "GOOGLE"
+   }
 }
 ```
 
