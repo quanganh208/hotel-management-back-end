@@ -16,17 +16,6 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import * as dayjs from 'dayjs';
 import { MailerService } from '@nestjs-modules/mailer';
 
-interface JwtPayload {
-  sub: string;
-
-  [key: string]: any;
-}
-
-interface TokenError {
-  name: string;
-  message: string;
-}
-
 @Injectable()
 export class AuthService {
   constructor(
@@ -78,14 +67,14 @@ export class AuthService {
       throw new BadRequestException('Tài khoản đã được kích hoạt trước đó');
     }
 
-    let verificationCode;
+    let verificationCode: number;
 
     if (
       user.verificationCode &&
       user.codeExpires &&
       dayjs().isBefore(dayjs(user.codeExpires))
     ) {
-      verificationCode = user.verificationCode;
+      verificationCode = Number(user.verificationCode);
     } else {
       verificationCode = Math.floor(10000000 + Math.random() * 90000000);
       await user.updateOne({
@@ -100,7 +89,7 @@ export class AuthService {
       template: 'register',
       context: {
         name: user.name,
-        code: verificationCode as number,
+        code: verificationCode,
         year: new Date().getFullYear(),
       },
     });
@@ -143,19 +132,19 @@ export class AuthService {
   }
 
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    const user = await this.usersService.findByResetToken(
+      resetPasswordDto.token,
+    );
+
+    if (!user) {
+      throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn');
+    }
+
+    if (!user.codeExpires || dayjs().isAfter(dayjs(user.codeExpires))) {
+      throw new BadRequestException('Token đã hết hạn');
+    }
+
     try {
-      const user = await this.usersService.findByResetToken(
-        resetPasswordDto.token,
-      );
-
-      if (!user) {
-        throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn');
-      }
-
-      if (!user.codeExpires || dayjs().isAfter(dayjs(user.codeExpires))) {
-        throw new BadRequestException('Token đã hết hạn');
-      }
-
       const hashedPassword = await hashPassword(resetPasswordDto.newPassword);
 
       await user.updateOne({
