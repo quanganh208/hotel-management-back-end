@@ -13,13 +13,7 @@ import aqp from 'api-query-params';
 import { RegisterDto } from '@/auth/dto/register.dto';
 import * as dayjs from 'dayjs';
 import { ActivateAccountDto } from '@/auth/dto/activate-account.dto';
-
-interface GoogleUserData {
-  email: string;
-  name: string;
-  googleId: string;
-  image?: string;
-}
+import { GoogleUserData } from './types/user.types';
 
 @Injectable()
 export class UsersService {
@@ -143,7 +137,6 @@ export class UsersService {
   }
 
   async createGoogleUser(userData: GoogleUserData): Promise<UserDocument> {
-    // Kiểm tra xem email đã tồn tại chưa
     const existingUser = await this.userModel.findOne({
       email: userData.email,
     });
@@ -151,14 +144,13 @@ export class UsersService {
       throw new BadRequestException('Email đã tồn tại trong hệ thống');
     }
 
-    // Tạo người dùng mới với thông tin từ Google
     return await new this.userModel({
       email: userData.email,
       name: userData.name,
       googleId: userData.googleId,
       image: userData.image,
       accountType: 'GOOGLE',
-      isVerified: true, // Tài khoản Google được xem là đã xác thực
+      isVerified: true,
     }).save();
   }
 

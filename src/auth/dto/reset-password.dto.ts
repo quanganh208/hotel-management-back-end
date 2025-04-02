@@ -1,12 +1,22 @@
-import { IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsNotEmpty, IsString, Length } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class ResetPasswordDto {
-  @IsString({ message: 'Token không hợp lệ' })
+  @ApiProperty({
+    description: 'Token đặt lại mật khẩu',
+    example: 'f23d7a...12ec',
+  })
   @IsNotEmpty({ message: 'Token không được để trống' })
+  @IsString({ message: 'Token phải là chuỗi ký tự' })
   token: string;
 
-  @IsString({ message: 'Mật khẩu phải là chuỗi' })
-  @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
-  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
+  @ApiProperty({
+    description: 'Mật khẩu mới của người dùng',
+    example: 'newpassword123',
+    minLength: 6,
+    maxLength: 20,
+  })
+  @IsNotEmpty({ message: 'Mật khẩu mới không được để trống' })
+  @Length(6, 20, { message: 'Mật khẩu mới phải có độ dài từ 6 kí tự trở lên' })
   newPassword: string;
 }
