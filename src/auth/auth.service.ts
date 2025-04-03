@@ -36,13 +36,7 @@ export class AuthService {
   }
 
   login(user: UserDocument) {
-    const payload = {
-      sub: user._id,
-      email: user.email,
-      name: user.name,
-      accountType: user.accountType,
-      role: user.role,
-    };
+    const payload = { sub: user._id, email: user.email, name: user.name };
     return {
       message: 'Đăng nhập thành công',
       access_token: this.jwtService.sign(payload),
@@ -174,6 +168,7 @@ export class AuthService {
 
   async googleAuth(googleAuthDto: GoogleAuthDto) {
     try {
+      // Xác thực ID token từ Google
       const ticket = await this.verifyGoogleIdToken(googleAuthDto.idToken);
 
       if (!ticket) {
@@ -194,10 +189,13 @@ export class AuthService {
         return new BadRequestException('Email không được cung cấp từ Google');
       }
 
+      // Tìm người dùng theo email
       const existingUser = await this.usersService.findByEmail(email);
 
       if (existingUser) {
+        // Cập nhật thông tin Google nếu tài khoản đã tồn tại
         if (existingUser.accountType === 'GOOGLE') {
+          // Cập nhật thông tin Google nếu cần
           if (
             existingUser.googleId !== googleId ||
             existingUser.name !== name ||
@@ -210,14 +208,18 @@ export class AuthService {
             });
           }
         } else {
+          // Nếu tài khoản đăng ký bằng email/mật khẩu, liên kết với Google
           await existingUser.updateOne({
             googleId: googleId,
-            image: existingUser.image || image,
+            // Không cập nhật tên để giữ tên người dùng đã chọn khi đăng ký
+            image: existingUser.image || image, // Giữ ảnh hiện tại nếu có, nếu không thì dùng ảnh Google
           });
         }
 
+        // Đăng nhập người dùng
         return this.login(existingUser);
       } else {
+        // Tạo tài khoản mới với thông tin Google
         const newUser = await this.usersService.createGoogleUser({
           email,
           name: name || '',
@@ -225,6 +227,7 @@ export class AuthService {
           image,
         });
 
+        // Đăng nhập người dùng mới
         return this.login(newUser);
       }
     } catch (error) {

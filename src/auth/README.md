@@ -59,14 +59,14 @@ Hệ thống hỗ trợ liên kết tài khoản giữa đăng nhập thông th�
 
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "Bearer",
-  "user": {
-    "_id": "60a1b2c3d4e5f6a7b8c9d0e1",
-    "email": "user@example.com",
-    "name": "User Name",
-    "accountType": "GOOGLE"
-  }
+   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+   "token_type": "Bearer",
+   "user": {
+      "_id": "60a1b2c3d4e5f6a7b8c9d0e1",
+      "email": "user@example.com",
+      "name": "User Name",
+      "accountType": "GOOGLE"
+   }
 }
 ```
 
@@ -119,8 +119,11 @@ const GoogleLoginButton = () => {
       const data = await response.json();
 
       if (response.ok) {
+        // Lưu token và thông tin người dùng
         localStorage.setItem('access_token', data.access_token);
+        // Chuyển hướng hoặc cập nhật trạng thái
       } else {
+        // Xử lý lỗi
         console.error('Đăng nhập thất bại:', data.message);
       }
     } catch (error) {
@@ -188,7 +191,9 @@ export default {
         const data = await result.json();
 
         if (result.ok) {
+          // Lưu token và thông tin người dùng
           localStorage.setItem('access_token', data.access_token);
+          // Chuyển hướng hoặc cập nhật trạng thái
         } else {
           console.error('Đăng nhập thất bại:', data.message);
         }

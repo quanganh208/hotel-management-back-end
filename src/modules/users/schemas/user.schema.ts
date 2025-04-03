@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { HydratedDocument } from 'mongoose';
+import { HydratedDocument } from 'mongoose';
 
 export type UserDocument = HydratedDocument<User>;
 
@@ -23,9 +23,6 @@ export class User {
   @Prop({ default: 'LOCAL' })
   accountType: string;
 
-  @Prop({ default: 'OWNER' })
-  role: string;
-
   @Prop({ default: false })
   isVerified: boolean;
 
@@ -37,9 +34,6 @@ export class User {
 
   @Prop()
   resetToken: string;
-
-  @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Hotel' }] })
-  hotels: mongoose.Types.ObjectId[];
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
