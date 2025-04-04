@@ -1,0 +1,109 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Room, RoomDocument } from './schemas/room.schema';
+import { CreateRoomDto } from './dto/create-room.dto';
+import { RoomTypesService } from '../hotels.room-types/room-types.service';
+import mongoose from 'mongoose';
+import { UpdateRoomDto } from './dto/update-room.dto';
+
+@Injectable()
+export class RoomsService {
+  constructor(
+    @InjectModel(Room.name) private roomModel: Model<RoomDocument>,
+    private roomTypesService: RoomTypesService,
+  ) {}
+
+  async create(createRoomDto: CreateRoomDto): Promise<Room> {
+    // Kiểm tra xem roomType có tồn tại không
+    await this.roomTypesService.findOne(createRoomDto.roomTypeId);
+
+    const newRoom = new this.roomModel(createRoomDto);
+    const savedRoom = await newRoom.save();
+
+    // Thêm room vào roomType
+    await this.roomTypesService.addRoomToRoomType(
+      createRoomDto.roomTypeId,
+      savedRoom._id,
+    );
+
+    return savedRoom;
+  }
+
+  async findAll(hotelId: mongoose.Types.ObjectId): Promise<Room[]> {
+    return this.roomModel.find({ hotelId }).exec();
+  }
+
+  async findOne(id: mongoose.Types.ObjectId): Promise<Room> {
+    const room = await this.roomModel.findById(id).exec();
+    if (!room) {
+      throw new NotFoundException(`Phòng với ID ${id} không tìm thấy`);
+    }
+    return room;
+  }
+
+  async findByHotelId(hotelId: mongoose.Types.ObjectId): Promise<Room[]> {
+    return this.roomModel.find({ hotelId }).exec();
+  }
+
+  async findByRoomTypeId(roomTypeId: mongoose.Types.ObjectId): Promise<Room[]> {
+    return this.roomModel.find({ roomTypeId }).exec();
+  }
+
+  async update(
+    id: mongoose.Types.ObjectId,
+    updateRoomDto: UpdateRoomDto,
+  ): Promise<Room> {
+    // Nếu đang thay đổi roomTypeId, cần kiểm tra roomTypeId mới có tồn tại không
+    if (updateRoomDto.roomTypeId) {
+      await this.roomTypesService.findOne(updateRoomDto.roomTypeId);
+    }
+
+    const existingRoom = await this.findOne(id);
+    const oldRoomTypeId =
+      existingRoom.roomTypeId as unknown as mongoose.Types.ObjectId;
+
+    const updatedRoom = await this.roomModel.findByIdAndUpdate(
+      id,
+      { $set: updateRoomDto },
+      { new: true },
+    );
+
+    if (!updatedRoom) {
+      throw new NotFoundException(`Phòng với ID ${id} không tìm thấy`);
+    }
+
+    // Nếu đã thay đổi roomTypeId
+    if (
+      updateRoomDto.roomTypeId &&
+      oldRoomTypeId.toString() !== updateRoomDto.roomTypeId.toString()
+    ) {
+      // Xóa room khỏi roomType cũ
+      await this.roomTypesService.removeRoomFromRoomType(oldRoomTypeId, id);
+
+      // Thêm room vào roomType mới
+      await this.roomTypesService.addRoomToRoomType(
+        updateRoomDto.roomTypeId,
+        id,
+      );
+    }
+
+    return updatedRoom;
+  }
+
+  async remove(id: mongoose.Types.ObjectId): Promise<Room> {
+    const room = await this.findOne(id);
+
+    // Xóa room khỏi roomType
+    await this.roomTypesService.removeRoomFromRoomType(
+      room.roomTypeId as unknown as mongoose.Types.ObjectId,
+      id,
+    );
+
+    const deletedRoom = await this.roomModel.findByIdAndDelete(id);
+    if (!deletedRoom) {
+      throw new NotFoundException(`Phòng với ID ${id} không tìm thấy`);
+    }
+    return deletedRoom;
+  }
+}

@@ -8,11 +8,13 @@ import {
   UploadedFile,
   UseInterceptors,
   ForbiddenException,
+  Patch,
+  Delete,
+  Query,
 } from '@nestjs/common';
 import { HotelsService } from './hotels.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { Hotel } from './schemas/hotel.schema';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { SupabaseStorageService } from '@/helpers/supabase-storage.service';
 import {
   ApiBearerAuth,
@@ -25,6 +27,10 @@ import {
 } from '@nestjs/swagger';
 import { RequestWithUser } from '@/types/express';
 import { PopulatedHotel } from '@/types/mongoose.types';
+import { RoomTypesService } from '../hotels.room-types/room-types.service';
+import { RoomsService } from '../hotels.rooms/rooms.service';
+import mongoose from 'mongoose';
+import { UploadInterceptor } from '@/helpers/upload.interceptor';
 
 @ApiTags('hotels')
 @ApiBearerAuth()
@@ -33,10 +39,12 @@ export class HotelsController {
   constructor(
     private readonly hotelsService: HotelsService,
     private readonly supabaseStorageService: SupabaseStorageService,
+    private readonly roomTypesService: RoomTypesService,
+    private readonly roomsService: RoomsService,
   ) {}
 
   @Post()
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(UploadInterceptor('image'))
   @ApiOperation({ summary: 'Tạo khách sạn mới' })
   @ApiResponse({
     status: 201,
@@ -144,5 +152,59 @@ export class HotelsController {
     }
 
     return hotel;
+  }
+
+  @Get(':id/room-types')
+  @ApiOperation({ summary: 'Lấy danh sách hạng phòng theo khách sạn' })
+  @ApiResponse({
+    status: 200,
+    description: 'Trả về danh sách hạng phòng.',
+  })
+  @ApiResponse({ status: 403, description: 'Không có quyền truy cập.' })
+  @ApiParam({ name: 'id', description: 'ID của khách sạn' })
+  async getRoomTypes(@Param('id') id: string, @Request() req: RequestWithUser) {
+    // Kiểm tra xem người dùng có quyền truy cập khách sạn này không
+    const hotel = await this.hotelsService.findOne(id);
+
+    const userId = req.user.userId;
+    const hotelOwnerId = this.hotelsService.extractOwnerId(hotel);
+    const isOwner = hotelOwnerId ? hotelOwnerId === userId : false;
+    const isStaff = this.hotelsService.isUserStaffMember(hotel, userId);
+
+    if (!isOwner && !isStaff) {
+      throw new ForbiddenException(
+        'Bạn không có quyền truy cập thông tin khách sạn này',
+      );
+    }
+
+    const hotelId = new mongoose.Types.ObjectId(id);
+    return this.roomTypesService.findByHotelId(hotelId);
+  }
+
+  @Get(':id/rooms')
+  @ApiOperation({ summary: 'Lấy danh sách phòng theo khách sạn' })
+  @ApiResponse({
+    status: 200,
+    description: 'Trả về danh sách phòng.',
+  })
+  @ApiResponse({ status: 403, description: 'Không có quyền truy cập.' })
+  @ApiParam({ name: 'id', description: 'ID của khách sạn' })
+  async getRooms(@Param('id') id: string, @Request() req: RequestWithUser) {
+    // Kiểm tra xem người dùng có quyền truy cập khách sạn này không
+    const hotel = await this.hotelsService.findOne(id);
+
+    const userId = req.user.userId;
+    const hotelOwnerId = this.hotelsService.extractOwnerId(hotel);
+    const isOwner = hotelOwnerId ? hotelOwnerId === userId : false;
+    const isStaff = this.hotelsService.isUserStaffMember(hotel, userId);
+
+    if (!isOwner && !isStaff) {
+      throw new ForbiddenException(
+        'Bạn không có quyền truy cập thông tin khách sạn này',
+      );
+    }
+
+    const hotelId = new mongoose.Types.ObjectId(id);
+    return this.roomsService.findByHotelId(hotelId);
   }
 }

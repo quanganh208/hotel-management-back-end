@@ -19,13 +19,13 @@ export function UploadInterceptor(fieldName: string = 'file') {
       const fileInterceptor = new (FileInterceptor(fieldName, {
         storage: multer.memoryStorage(),
         limits: {
-          fileSize: 5 * 1024 * 1024,
+          fileSize: 10 * 1024 * 1024,
         },
         fileFilter: (req, file, callback) => {
-          if (!file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
+          if (!file.mimetype.match(/\/(jpg|jpeg|png|gif|webp)$/)) {
             return callback(
               new BadRequestException(
-                'Chỉ hỗ trợ file hình ảnh (jpg, jpeg, png, gif)',
+                'Chỉ hỗ trợ file hình ảnh (jpg, jpeg, png, gif, webp)',
               ),
               false,
             );

@@ -42,6 +42,7 @@ export class HotelsService {
   }
 
   async findOne(id: string): Promise<PopulatedHotel> {
+    console.log(id);
     if (id === 'owner' || id === 'staff' || id.length !== 24) {
       throw new NotFoundException('ID khách sạn không hợp lệ');
     }
@@ -75,35 +76,44 @@ export class HotelsService {
       .exec() as unknown as Promise<PopulatedHotel[]>;
   }
 
-  extractOwnerId(hotel: Hotel | PopulatedHotel): string | null {
-    if (!hotel || !hotel.owner) return null;
-
-    if (hotel.owner instanceof Types.ObjectId) {
-      return hotel.owner.toString();
+  extractOwnerId(hotel: any): string {
+    if (!hotel) {
+      throw new NotFoundException('Không tìm thấy khách sạn');
     }
 
-    if (hasMongoId(hotel.owner)) {
+    // Xử lý trường hợp owner đã được populate
+    if (hotel.owner && typeof hotel.owner === 'object' && hotel.owner._id) {
       return hotel.owner._id.toString();
     }
 
-    return null;
+    // Trường hợp owner chỉ là ID
+    return hotel.owner?.toString();
   }
 
-  isUserStaffMember(hotel: Hotel | PopulatedHotel, userId: string): boolean {
-    if (!hotel || !hotel.staff || !Array.isArray(hotel.staff) || !userId) {
+  isUserStaffMember(hotel: any, userId: string): boolean {
+    if (!hotel || !userId) {
       return false;
     }
 
-    return hotel.staff.some((staffMember) => {
-      if (staffMember instanceof Types.ObjectId) {
-        return staffMember.toString() === userId;
-      }
+    // Kiểm tra nếu staff là mảng các ID
+    if (hotel.staff && Array.isArray(hotel.staff)) {
+      return hotel.staff.some((staffId) => {
+        if (typeof staffId === 'string') {
+          return staffId === userId;
+        }
 
-      if (hasMongoId(staffMember)) {
-        return staffMember._id.toString() === userId;
-      }
+        if (staffId instanceof Types.ObjectId) {
+          return staffId.toString() === userId;
+        }
 
-      return false;
-    });
+        if (typeof staffId === 'object' && staffId._id) {
+          return staffId._id.toString() === userId;
+        }
+
+        return false;
+      });
+    }
+
+    return false;
   }
 }
