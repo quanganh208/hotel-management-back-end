@@ -97,7 +97,7 @@ export class RoomTypesController {
     @Request() req: RequestWithUser,
     @Body() createRoomTypeDto: CreateRoomTypeDto,
     @UploadedFile() file?: Express.Multer.File,
-  ): Promise<RoomType> {
+  ): Promise<{ message: string; data: RoomType }> {
     // Kiểm tra quyền OWNER
     if (req.user.role !== 'OWNER') {
       throw new ForbiddenException(
@@ -123,7 +123,11 @@ export class RoomTypesController {
       );
     }
 
-    return this.roomTypesService.create(createRoomTypeDto);
+    const roomType = await this.roomTypesService.create(createRoomTypeDto);
+    return {
+      message: 'Tạo hạng phòng thành công',
+      data: roomType,
+    };
   }
 
   @Get()
@@ -209,7 +213,7 @@ export class RoomTypesController {
     @Request() req: RequestWithUser,
     @Body() updateRoomTypeDto: UpdateRoomTypeDto,
     @UploadedFile() file?: Express.Multer.File,
-  ): Promise<RoomType> {
+  ): Promise<{ message: string; data: RoomType }> {
     // Kiểm tra quyền OWNER
     if (req.user.role !== 'OWNER') {
       throw new ForbiddenException(
@@ -238,7 +242,14 @@ export class RoomTypesController {
       );
     }
 
-    return this.roomTypesService.update(objectId, updateRoomTypeDto);
+    const updatedRoomType = await this.roomTypesService.update(
+      objectId,
+      updateRoomTypeDto,
+    );
+    return {
+      message: 'Cập nhật hạng phòng thành công',
+      data: updatedRoomType,
+    };
   }
 
   @Delete(':id')
@@ -253,7 +264,7 @@ export class RoomTypesController {
   async remove(
     @Param('id') id: string,
     @Request() req: RequestWithUser,
-  ): Promise<RoomType> {
+  ): Promise<{ message: string }> {
     // Kiểm tra quyền OWNER
     if (req.user.role !== 'OWNER') {
       throw new ForbiddenException(
@@ -275,6 +286,7 @@ export class RoomTypesController {
       );
     }
 
-    return this.roomTypesService.remove(objectId);
+    await this.roomTypesService.remove(objectId);
+    return { message: 'Xóa hạng phòng thành công' };
   }
 }
