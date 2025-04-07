@@ -18,33 +18,38 @@ export class RoomTypesService {
   }
 
   async findAll(hotelId: mongoose.Types.ObjectId): Promise<RoomType[]> {
-    return this.roomTypeModel.find({ hotelId }).exec();
+    return this.roomTypeModel.find({ hotelId }).populate('rooms').exec();
   }
 
   async findOne(id: mongoose.Types.ObjectId): Promise<RoomType> {
-    const roomType = await this.roomTypeModel.findById(id).exec();
+    const roomType = await this.roomTypeModel
+      .findById(id)
+      .populate('rooms')
+      .exec();
     if (!roomType) {
-      throw new NotFoundException(`Room type với ID ${id} không tìm thấy`);
+      throw new NotFoundException(
+        `Room type với ID ${id.toString()} không tìm thấy`,
+      );
     }
     return roomType;
   }
 
   async findByHotelId(hotelId: mongoose.Types.ObjectId): Promise<RoomType[]> {
-    return this.roomTypeModel.find({ hotelId }).exec();
+    return this.roomTypeModel.find({ hotelId }).populate('rooms').exec();
   }
 
   async update(
     id: mongoose.Types.ObjectId,
     updateRoomTypeDto: UpdateRoomTypeDto,
   ): Promise<RoomType> {
-    const updatedRoomType = await this.roomTypeModel.findByIdAndUpdate(
-      id,
-      { $set: updateRoomTypeDto },
-      { new: true },
-    );
+    const updatedRoomType = await this.roomTypeModel
+      .findByIdAndUpdate(id, { $set: updateRoomTypeDto }, { new: true })
+      .populate('rooms');
 
     if (!updatedRoomType) {
-      throw new NotFoundException(`Room type với ID ${id} không tìm thấy`);
+      throw new NotFoundException(
+        `Room type với ID ${id.toString()} không tìm thấy`,
+      );
     }
 
     return updatedRoomType;
@@ -54,7 +59,9 @@ export class RoomTypesService {
     const deletedRoomType = await this.roomTypeModel.findByIdAndDelete(id);
 
     if (!deletedRoomType) {
-      throw new NotFoundException(`Room type với ID ${id} không tìm thấy`);
+      throw new NotFoundException(
+        `Room type với ID ${id.toString()} không tìm thấy`,
+      );
     }
 
     return deletedRoomType;
@@ -64,15 +71,17 @@ export class RoomTypesService {
     roomTypeId: mongoose.Types.ObjectId,
     roomId: mongoose.Types.ObjectId,
   ): Promise<RoomType> {
-    const updatedRoomType = await this.roomTypeModel.findByIdAndUpdate(
-      roomTypeId,
-      { $push: { rooms: roomId } },
-      { new: true },
-    );
+    const updatedRoomType = await this.roomTypeModel
+      .findByIdAndUpdate(
+        roomTypeId,
+        { $push: { rooms: roomId } },
+        { new: true },
+      )
+      .populate('rooms');
 
     if (!updatedRoomType) {
       throw new NotFoundException(
-        `Room type với ID ${roomTypeId} không tìm thấy`,
+        `Room type với ID ${roomTypeId.toString()} không tìm thấy`,
       );
     }
 
@@ -83,15 +92,17 @@ export class RoomTypesService {
     roomTypeId: mongoose.Types.ObjectId,
     roomId: mongoose.Types.ObjectId,
   ): Promise<RoomType> {
-    const updatedRoomType = await this.roomTypeModel.findByIdAndUpdate(
-      roomTypeId,
-      { $pull: { rooms: roomId } },
-      { new: true },
-    );
+    const updatedRoomType = await this.roomTypeModel
+      .findByIdAndUpdate(
+        roomTypeId,
+        { $pull: { rooms: roomId } },
+        { new: true },
+      )
+      .populate('rooms');
 
     if (!updatedRoomType) {
       throw new NotFoundException(
-        `Room type với ID ${roomTypeId} không tìm thấy`,
+        `Room type với ID ${roomTypeId.toString()} không tìm thấy`,
       );
     }
 

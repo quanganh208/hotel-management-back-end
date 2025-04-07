@@ -1,21 +1,20 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
+  Inject,
   Param,
   Post,
   Request,
   UploadedFile,
   UseInterceptors,
-  ForbiddenException,
-  Patch,
-  Delete,
-  Query,
+  forwardRef,
 } from '@nestjs/common';
 import { HotelsService } from './hotels.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { Hotel } from './schemas/hotel.schema';
-import { SupabaseStorageService } from '@/helpers/supabase-storage.service';
+import { RequestWithUser } from '@/types/express';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -25,12 +24,12 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { RequestWithUser } from '@/types/express';
-import { PopulatedHotel } from '@/types/mongoose.types';
+import { SupabaseStorageService } from '@/helpers/supabase-storage.service';
+import { UploadInterceptor } from '@/helpers/upload.interceptor';
+import mongoose from 'mongoose';
 import { RoomTypesService } from '../hotels.room-types/room-types.service';
 import { RoomsService } from '../hotels.rooms/rooms.service';
-import mongoose from 'mongoose';
-import { UploadInterceptor } from '@/helpers/upload.interceptor';
+import { PopulatedHotel } from '@/types/mongoose.types';
 
 @ApiTags('hotels')
 @ApiBearerAuth()
@@ -40,6 +39,7 @@ export class HotelsController {
     private readonly hotelsService: HotelsService,
     private readonly supabaseStorageService: SupabaseStorageService,
     private readonly roomTypesService: RoomTypesService,
+    @Inject(forwardRef(() => RoomsService))
     private readonly roomsService: RoomsService,
   ) {}
 

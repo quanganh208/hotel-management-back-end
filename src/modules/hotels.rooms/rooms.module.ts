@@ -1,27 +1,29 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { RoomsController } from './rooms.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Room, RoomSchema } from './schemas/room.schema';
-import { SupabaseStorageService } from '@/helpers/supabase-storage.service';
-import { ConfigModule } from '@nestjs/config';
-import { HotelsService } from '../hotels/hotels.service';
-import { Hotel, HotelSchema } from '../hotels/schemas/hotel.schema';
-import { User, UserSchema } from '../users/schemas/user.schema';
 import { RoomTypesModule } from '../hotels.room-types/room-types.module';
+import { SupabaseStorageService } from '@/helpers/supabase-storage.service';
+import { HotelsModule } from '../hotels/hotels.module';
+import { RoomStatusLogsService } from './room-status-logs.service';
+import { RoomStatusLogsController } from './room-status-logs.controller';
+import {
+  RoomStatusLog,
+  RoomStatusLogSchema,
+} from './schemas/room-status-log.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Room.name, schema: RoomSchema },
-      { name: Hotel.name, schema: HotelSchema },
-      { name: User.name, schema: UserSchema },
+      { name: RoomStatusLog.name, schema: RoomStatusLogSchema },
     ]),
-    ConfigModule,
     RoomTypesModule,
+    forwardRef(() => HotelsModule),
   ],
-  controllers: [RoomsController],
-  providers: [RoomsService, SupabaseStorageService, HotelsService],
+  controllers: [RoomsController, RoomStatusLogsController],
+  providers: [RoomsService, SupabaseStorageService, RoomStatusLogsService],
   exports: [RoomsService],
 })
 export class RoomsModule {}

@@ -5,7 +5,6 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
 import mongoose from 'mongoose';
 import { RoomStatus } from '../schemas/room.schema';
 import { ApiProperty } from '@nestjs/swagger';
@@ -62,4 +61,13 @@ export class CreateRoomDto {
   @IsOptional()
   @IsString()
   image?: string;
+
+  @ApiProperty({
+    description: 'Ghi chú về phòng',
+    example: 'Phòng có view đẹp, hướng ra biển',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  note?: string;
 }

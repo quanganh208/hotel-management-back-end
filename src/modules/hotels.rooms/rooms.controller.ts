@@ -4,7 +4,7 @@ import {
   Delete,
   ForbiddenException,
   Get,
-  NotFoundException,
+  Inject,
   Param,
   Patch,
   Post,
@@ -12,6 +12,7 @@ import {
   Request,
   UploadedFile,
   UseInterceptors,
+  forwardRef,
 } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { CreateRoomDto } from './dto/create-room.dto';
@@ -31,6 +32,7 @@ import {
 import { RequestWithUser } from '@/types/express';
 import { HotelsService } from '../hotels/hotels.service';
 import { UploadInterceptor } from '@/helpers/upload.interceptor';
+import { UpdateRoomStatusWithNoteDto } from './dto/update-room-status-with-note.dto';
 
 @ApiTags('rooms')
 @ApiBearerAuth()
@@ -39,6 +41,7 @@ export class RoomsController {
   constructor(
     private readonly roomsService: RoomsService,
     private readonly supabaseStorageService: SupabaseStorageService,
+    @Inject(forwardRef(() => HotelsService))
     private readonly hotelsService: HotelsService,
   ) {}
 
@@ -86,6 +89,11 @@ export class RoomsController {
           format: 'binary',
           description: 'Hình ảnh phòng',
         },
+        note: {
+          type: 'string',
+          example: 'Phòng có view đẹp, hướng ra biển',
+          description: 'Ghi chú về phòng',
+        },
       },
     },
   })
@@ -93,7 +101,7 @@ export class RoomsController {
     @Request() req: RequestWithUser,
     @Body() createRoomDto: CreateRoomDto,
     @UploadedFile() file?: Express.Multer.File,
-  ): Promise<Room> {
+  ): Promise<{ message: string; data: Room }> {
     // Kiểm tra quyền OWNER
     if (req.user.role !== 'OWNER') {
       throw new ForbiddenException('Chỉ chủ khách sạn mới có quyền tạo phòng');
@@ -116,7 +124,11 @@ export class RoomsController {
         'rooms',
       );
     }
-    return this.roomsService.create(createRoomDto);
+    const room = await this.roomsService.create(createRoomDto);
+    return {
+      message: 'Tạo phòng thành công',
+      data: room,
+    };
   }
 
   @Get()
@@ -232,12 +244,49 @@ export class RoomsController {
   @ApiResponse({ status: 403, description: 'Không có quyền thực hiện.' })
   @ApiConsumes('multipart/form-data')
   @ApiParam({ name: 'id', description: 'ID của phòng' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        roomNumber: {
+          type: 'string',
+          example: '101',
+          description: 'Số phòng',
+        },
+        roomTypeId: {
+          type: 'string',
+          example: '60d21b4667d0d8992e610c85',
+          description: 'ID của hạng phòng',
+        },
+        floor: {
+          type: 'string',
+          example: '1',
+          description: 'Tầng',
+        },
+        status: {
+          type: 'string',
+          example: 'available',
+          description: 'Trạng thái phòng',
+        },
+        image: {
+          type: 'string',
+          format: 'binary',
+          description: 'Hình ảnh phòng',
+        },
+        note: {
+          type: 'string',
+          example: 'Phòng có view đẹp, hướng ra biển',
+          description: 'Ghi chú về phòng',
+        },
+      },
+    },
+  })
   async update(
     @Param('id') id: string,
     @Request() req: RequestWithUser,
     @Body() updateRoomDto: UpdateRoomDto,
     @UploadedFile() file?: Express.Multer.File,
-  ): Promise<Room> {
+  ): Promise<{ message: string; data: Room }> {
     // Kiểm tra quyền OWNER
     if (req.user.role !== 'OWNER') {
       throw new ForbiddenException(
@@ -266,7 +315,11 @@ export class RoomsController {
       );
     }
 
-    return this.roomsService.update(objectId, updateRoomDto);
+    const updatedRoom = await this.roomsService.update(objectId, updateRoomDto);
+    return {
+      message: 'Cập nhật phòng thành công',
+      data: updatedRoom,
+    };
   }
 
   @Delete(':id')
@@ -281,7 +334,7 @@ export class RoomsController {
   async remove(
     @Param('id') id: string,
     @Request() req: RequestWithUser,
-  ): Promise<Room> {
+  ): Promise<{ message: string }> {
     // Kiểm tra quyền OWNER
     if (req.user.role !== 'OWNER') {
       throw new ForbiddenException('Chỉ chủ khách sạn mới có quyền xóa phòng');
@@ -301,6 +354,65 @@ export class RoomsController {
       );
     }
 
-    return this.roomsService.remove(objectId);
+    await this.roomsService.remove(objectId);
+    return { message: 'Xóa phòng thành công' };
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({
+    summary: 'Cập nhật trạng thái phòng (Dành cho OWNER và STAFF)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật trạng thái phòng thành công.',
+  })
+  @ApiResponse({ status: 404, description: 'Phòng không tồn tại.' })
+  @ApiResponse({ status: 403, description: 'Không có quyền thực hiện.' })
+  @ApiParam({ name: 'id', description: 'ID của phòng' })
+  @ApiBody({ type: UpdateRoomStatusWithNoteDto })
+  async updateStatus(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+    @Body() updateRoomStatusDto: UpdateRoomStatusWithNoteDto,
+  ): Promise<{ message: string; data: Room }> {
+    // Kiểm tra quyền OWNER hoặc STAFF
+    if (req.user.role !== 'OWNER' && req.user.role !== 'STAFF') {
+      throw new ForbiddenException(
+        'Chỉ chủ khách sạn hoặc nhân viên mới có quyền cập nhật trạng thái phòng',
+      );
+    }
+
+    const objectId = new mongoose.Types.ObjectId(id);
+    const room = await this.roomsService.findOne(objectId);
+
+    // Kiểm tra xem người dùng có phải là chủ hoặc nhân viên của khách sạn này không
+    const hotelId = room.hotelId.toString();
+    const hotel = await this.hotelsService.findOne(hotelId);
+
+    const ownerId = this.hotelsService.extractOwnerId(hotel);
+    const isOwner = ownerId === req.user.userId;
+    const isStaff = this.hotelsService.isUserStaffMember(
+      hotel,
+      req.user.userId,
+    );
+
+    if (!isOwner && !isStaff) {
+      throw new ForbiddenException(
+        'Bạn không có quyền cập nhật trạng thái phòng của khách sạn này',
+      );
+    }
+
+    const userIdObj = new mongoose.Types.ObjectId(req.user.userId);
+    const updatedRoom = await this.roomsService.updateStatus(
+      objectId,
+      updateRoomStatusDto.status,
+      userIdObj,
+      updateRoomStatusDto.note,
+    );
+
+    return {
+      message: 'Cập nhật trạng thái phòng thành công',
+      data: updatedRoom,
+    };
   }
 }

@@ -14,6 +14,11 @@ import {
   RoomType,
   RoomTypeSchema,
 } from '../hotels.room-types/schemas/room-type.schema';
+import { RoomStatusLogsService } from '../hotels.rooms/room-status-logs.service';
+import {
+  RoomStatusLog,
+  RoomStatusLogSchema,
+} from '../hotels.rooms/schemas/room-status-log.schema';
 
 @Module({
   imports: [
@@ -23,11 +28,18 @@ import {
       { name: Hotel.name, schema: HotelSchema },
       { name: User.name, schema: UserSchema },
       { name: RoomType.name, schema: RoomTypeSchema },
+      { name: RoomStatusLog.name, schema: RoomStatusLogSchema },
     ]),
     RoomTypesModule,
   ],
   controllers: [BookingsController],
-  providers: [BookingsService, RoomsService, HotelsService, RoomTypesService],
+  providers: [
+    BookingsService,
+    RoomsService,
+    HotelsService,
+    RoomTypesService,
+    RoomStatusLogsService,
+  ],
   exports: [BookingsService],
 })
 export class BookingsModule {}
