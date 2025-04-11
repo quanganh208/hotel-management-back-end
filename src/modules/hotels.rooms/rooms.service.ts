@@ -8,6 +8,7 @@ import mongoose from 'mongoose';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { RoomStatusLogsService } from './room-status-logs.service';
 import { CreateRoomStatusLogDto } from './dto/create-room-status-log.dto';
+import { UpdateRoomStatusWithNoteDto } from './dto/update-room-status-with-note.dto';
 
 @Injectable()
 export class RoomsService {
@@ -101,9 +102,8 @@ export class RoomsService {
 
   async updateStatus(
     id: mongoose.Types.ObjectId,
-    status: string,
-    userId: mongoose.Types.ObjectId,
-    note?: string,
+    updateStatusDto: UpdateRoomStatusWithNoteDto,
+    userId: string,
   ): Promise<Room> {
     // Lấy thông tin phòng hiện tại để ghi log trạng thái trước đó
     const currentRoom = await this.findOne(id);
@@ -111,7 +111,7 @@ export class RoomsService {
 
     // Cập nhật trạng thái mới
     const updatedRoom = await this.roomModel
-      .findByIdAndUpdate(id, { status }, { new: true })
+      .findByIdAndUpdate(id, { status: updateStatusDto.status }, { new: true })
       .populate('roomTypeId');
 
     if (!updatedRoom) {
@@ -121,12 +121,13 @@ export class RoomsService {
     }
 
     // Lưu log thay đổi trạng thái
+    const userIdObj = new mongoose.Types.ObjectId(userId);
     const logDto: CreateRoomStatusLogDto = {
       roomId: id,
-      status: status as RoomStatus,
+      status: updateStatusDto.status as RoomStatus,
       previousStatus: previousStatus as RoomStatus,
-      changedBy: userId,
-      note: note,
+      changedBy: userIdObj,
+      note: updateStatusDto.note,
     };
 
     await this.roomStatusLogsService.create(logDto);

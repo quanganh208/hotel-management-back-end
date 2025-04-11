@@ -10,6 +10,7 @@ import {
   UploadedFile,
   UseInterceptors,
   forwardRef,
+  UseGuards,
 } from '@nestjs/common';
 import { HotelsService } from './hotels.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
@@ -30,10 +31,14 @@ import mongoose from 'mongoose';
 import { RoomTypesService } from '../hotels.room-types/room-types.service';
 import { RoomsService } from '../hotels.rooms/rooms.service';
 import { PopulatedHotel } from '@/types/mongoose.types';
+import { JwtAuthGuard } from '@/auth/passport/jwt-auth.guard';
+import { RolesGuard } from '@/auth/guards/roles.guard';
+import { Roles } from '@/decorator/roles.decorator';
 
 @ApiTags('hotels')
 @ApiBearerAuth()
 @Controller('hotels')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class HotelsController {
   constructor(
     private readonly hotelsService: HotelsService,
@@ -44,14 +49,15 @@ export class HotelsController {
   ) {}
 
   @Post()
+  @Roles('OWNER')
   @UseInterceptors(UploadInterceptor('image'))
-  @ApiOperation({ summary: 'Tạo khách sạn mới' })
+  @ApiOperation({ summary: 'Tạo khách sạn mới (Chỉ OWNER)' })
   @ApiResponse({
     status: 201,
     description: 'Tạo khách sạn thành công.',
   })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ.' })
-  @ApiResponse({ status: 401, description: 'Không có quyền truy cập.' })
+  @ApiResponse({ status: 403, description: 'Không có quyền truy cập.' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {

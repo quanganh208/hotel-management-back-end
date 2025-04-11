@@ -1,31 +1,25 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User, UserDocument } from '@/modules/users/schemas/user.schema';
-import { Model, SortOrder, Types } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { hashPassword } from '@/helpers/util';
-import aqp from 'api-query-params';
 import { RegisterDto } from '@/auth/dto/register.dto';
 import * as dayjs from 'dayjs';
 import { ActivateAccountDto } from '@/auth/dto/activate-account.dto';
 import { GoogleUserData } from './types/user.types';
+import { CreateEmployeeDto } from './dto/create-employee.dto';
 
 @Injectable()
 export class UsersService {
   constructor(@InjectModel(User.name) private userModel: Model<User>) {}
 
-  private async checkUserExists(
-    email?: string,
-    excludeId?: string,
-  ): Promise<void> {
-    const query = excludeId ? { _id: { $ne: excludeId } } : { email };
-
-    const isUserExist = await this.userModel.findOne(query);
+  private async checkUserExists(email: string): Promise<void> {
+    const isUserExist = await this.userModel.findOne({ email });
     if (isUserExist) {
       throw new BadRequestException(
         'Email đã tồn tại, vui lòng sử dụng email khác',
@@ -37,90 +31,6 @@ export class UsersService {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('ID không hợp lệ');
     }
-  }
-
-  async create(createUserDto: CreateUserDto) {
-    await this.checkUserExists(createUserDto.email);
-    const hashedPassword = await hashPassword(createUserDto.password);
-    await new this.userModel({
-      ...createUserDto,
-      password: hashedPassword,
-    }).save();
-
-    return {
-      message: 'Tạo tài khoản thành công',
-    };
-  }
-
-  async findAll(query: string, page: number, limit: number) {
-    const { filter, sort } = aqp(query);
-    if (filter.page) delete filter.page;
-    if (!page) page = 1;
-    if (!limit) limit = 10;
-
-    const totalItems = await this.userModel.countDocuments(filter);
-    const totalPages = Math.ceil(totalItems / limit);
-
-    const results = await this.userModel
-      .find(filter)
-      .select('-password')
-      .limit(limit)
-      .skip(limit * (page - 1))
-      .sort(sort as { [key: string]: SortOrder });
-
-    return {
-      totalItems,
-      totalPages,
-      results,
-    };
-  }
-
-  async findOne(id: string): Promise<User> {
-    this.validateMongoId(id);
-
-    const user = await this.userModel.findById(id).select('-password').exec();
-
-    if (!user) {
-      throw new NotFoundException('Không tìm thấy người dùng');
-    }
-
-    return user;
-  }
-
-  async update(id: string, updateUserDto: UpdateUserDto) {
-    this.validateMongoId(id);
-
-    await this.checkUserExists(id);
-
-    const user = await this.userModel.findById(id);
-
-    if (!user) {
-      throw new NotFoundException('Không tìm thấy người dùng');
-    }
-
-    await user.updateOne(updateUserDto);
-
-    return {
-      message: 'Cập nhật thông tin người dùng thành công',
-    };
-  }
-
-  async remove(id: string) {
-    this.validateMongoId(id);
-
-    await this.checkUserExists(id);
-
-    const user = await this.userModel.findById(id);
-
-    if (!user) {
-      throw new NotFoundException('Không tìm thấy người dùng');
-    }
-
-    await user.deleteOne();
-
-    return {
-      message: 'Xóa người dùng thành công',
-    };
   }
 
   async findByEmail(email: string) {
@@ -199,5 +109,114 @@ export class UsersService {
     return {
       message: 'Kích hoạt tài khoản thành công',
     };
+  }
+
+  private async generateEmployeeCode(): Promise<string> {
+    // Lấy nhân viên cuối cùng để xác định mã tiếp theo
+    const lastEmployee = await this.userModel
+      .findOne({ employeeCode: { $exists: true } })
+      .sort({ employeeCode: -1 })
+      .limit(1);
+
+    let nextNumber = 1;
+    const prefix = 'NV';
+
+    if (lastEmployee && lastEmployee.employeeCode) {
+      // Trích xuất phần số từ mã nhân viên
+      const currentNumber = parseInt(
+        lastEmployee.employeeCode.substring(2),
+        10,
+      );
+      if (!isNaN(currentNumber)) {
+        nextNumber = currentNumber + 1;
+      }
+    }
+
+    // Định dạng số thành chuỗi 6 ký tự với các số 0 ở đầu nếu cần
+    const paddedNumber = nextNumber.toString().padStart(6, '0');
+    return `${prefix}${paddedNumber}`;
+  }
+
+  async createEmployee(userId: string, createEmployeeDto: CreateEmployeeDto) {
+    const owner = await this.findById(userId);
+    if (!owner || owner.role !== 'OWNER') {
+      throw new ForbiddenException('Bạn không có quyền tạo nhân viên');
+    }
+
+    this.validateMongoId(createEmployeeDto.hotelId);
+    const hotelObjectId = new Types.ObjectId(createEmployeeDto.hotelId);
+
+    const isOwnerOfHotel = owner.hotels.some((hotelId) =>
+      hotelId.equals(hotelObjectId),
+    );
+
+    if (!isOwnerOfHotel) {
+      throw new ForbiddenException(
+        'Bạn không có quyền tạo nhân viên cho khách sạn này',
+      );
+    }
+
+    await this.checkUserExists(createEmployeeDto.email);
+    const hashedPassword = await hashPassword(createEmployeeDto.password);
+
+    // Tạo mã nhân viên tự động
+    const employeeCode = await this.generateEmployeeCode();
+
+    const newEmployee = await new this.userModel({
+      email: createEmployeeDto.email,
+      password: hashedPassword,
+      name: createEmployeeDto.name,
+      phoneNumber: createEmployeeDto.phoneNumber,
+      gender: createEmployeeDto.gender,
+      birthday: createEmployeeDto.birthday,
+      role: createEmployeeDto.role,
+      image: createEmployeeDto.image,
+      isVerified: true,
+      accountType: 'LOCAL',
+      hotels: [hotelObjectId],
+      employeeCode: employeeCode,
+      note: createEmployeeDto.note,
+    }).save();
+
+    return {
+      message: 'Tạo nhân viên thành công',
+      data: {
+        _id: newEmployee._id,
+        email: newEmployee.email,
+        name: newEmployee.name,
+        role: newEmployee.role,
+        phoneNumber: newEmployee.phoneNumber,
+        gender: newEmployee.gender,
+        birthday: newEmployee.birthday,
+        hotelId: createEmployeeDto.hotelId,
+        employeeCode: newEmployee.employeeCode,
+        note: newEmployee.note,
+        image: newEmployee.image,
+      },
+    };
+  }
+
+  async getEmployeesByHotel(userId: string, hotelId: string) {
+    this.validateMongoId(hotelId);
+    const hotelObjectId = new Types.ObjectId(hotelId);
+
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    // Kiểm tra xem người dùng có quyền quản lý khách sạn này không
+    const hasAccess = user.hotels.some((id) => id.equals(hotelObjectId));
+    if (!hasAccess) {
+      throw new ForbiddenException('Bạn không có quyền truy cập khách sạn này');
+    }
+
+    // Tìm tất cả nhân viên thuộc khách sạn này
+    return this.userModel
+      .find({
+        hotels: { $in: [hotelObjectId] },
+        _id: { $ne: user._id }, // Loại trừ người dùng hiện tại
+      })
+      .select('-password -verificationCode -codeExpires -resetToken');
   }
 }

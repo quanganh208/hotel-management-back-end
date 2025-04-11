@@ -39,6 +39,10 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: {
+        enableImplicitConversion: false,
+      },
       exceptionFactory: (errors) => {
         const customErrors = errors.map((error) => {
           if (error.constraints) {

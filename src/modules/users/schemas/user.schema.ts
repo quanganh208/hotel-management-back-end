@@ -3,6 +3,13 @@ import mongoose, { HydratedDocument } from 'mongoose';
 
 export type UserDocument = HydratedDocument<User>;
 
+export type UserRole =
+  | 'OWNER'
+  | 'MANAGER'
+  | 'RECEPTIONIST'
+  | 'HOUSEKEEPING'
+  | 'ACCOUNTANT';
+
 @Schema({ timestamps: true })
 export class User {
   @Prop()
@@ -20,11 +27,23 @@ export class User {
   @Prop()
   googleId: string;
 
+  @Prop()
+  phoneNumber: string;
+
+  @Prop({ enum: ['MALE', 'FEMALE', 'OTHER'] })
+  gender: string;
+
+  @Prop()
+  birthday: Date;
+
   @Prop({ default: 'LOCAL' })
   accountType: string;
 
-  @Prop({ default: 'OWNER' })
-  role: string;
+  @Prop({
+    default: 'OWNER',
+    enum: ['OWNER', 'MANAGER', 'RECEPTIONIST', 'HOUSEKEEPING', 'ACCOUNTANT'],
+  })
+  role: UserRole;
 
   @Prop({ default: false })
   isVerified: boolean;
@@ -40,6 +59,12 @@ export class User {
 
   @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Hotel' }] })
   hotels: mongoose.Types.ObjectId[];
+
+  @Prop()
+  employeeCode: string;
+
+  @Prop()
+  note: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

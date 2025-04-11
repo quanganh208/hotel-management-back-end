@@ -11,6 +11,7 @@ import {
   Request,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import { RoomTypesService } from './room-types.service';
 import { CreateRoomTypeDto } from './dto/create-room-type.dto';
@@ -30,10 +31,14 @@ import {
 import { RequestWithUser } from '@/types/express';
 import { HotelsService } from '../hotels/hotels.service';
 import { UploadInterceptor } from '@/helpers/upload.interceptor';
+import { JwtAuthGuard } from '@/auth/passport/jwt-auth.guard';
+import { RolesGuard } from '@/auth/guards/roles.guard';
+import { Roles } from '@/decorator/roles.decorator';
 
 @ApiTags('room-types')
 @ApiBearerAuth()
 @Controller('room-types')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class RoomTypesController {
   constructor(
     private readonly roomTypesService: RoomTypesService,
@@ -42,6 +47,7 @@ export class RoomTypesController {
   ) {}
 
   @Post()
+  @Roles('OWNER')
   @UseInterceptors(UploadInterceptor('image'))
   @ApiOperation({ summary: 'Tạo hạng phòng mới (Chỉ dành cho OWNER)' })
   @ApiResponse({
@@ -98,13 +104,6 @@ export class RoomTypesController {
     @Body() createRoomTypeDto: CreateRoomTypeDto,
     @UploadedFile() file?: Express.Multer.File,
   ): Promise<{ message: string; data: RoomType }> {
-    // Kiểm tra quyền OWNER
-    if (req.user.role !== 'OWNER') {
-      throw new ForbiddenException(
-        'Chỉ chủ khách sạn mới có quyền tạo hạng phòng',
-      );
-    }
-
     // Kiểm tra xem người dùng có phải là chủ của khách sạn này không
     const hotelId = createRoomTypeDto.hotelId.toString();
     const hotel = await this.hotelsService.findOne(hotelId);
@@ -131,6 +130,7 @@ export class RoomTypesController {
   }
 
   @Get()
+  @Roles('OWNER', 'MANAGER', 'RECEPTIONIST', 'HOUSEKEEPING', 'ACCOUNTANT')
   @ApiOperation({ summary: 'Lấy danh sách hạng phòng theo khách sạn' })
   @ApiResponse({
     status: 200,
@@ -161,6 +161,7 @@ export class RoomTypesController {
   }
 
   @Get(':id')
+  @Roles('OWNER', 'MANAGER', 'RECEPTIONIST', 'HOUSEKEEPING', 'ACCOUNTANT')
   @ApiOperation({ summary: 'Lấy thông tin chi tiết của một hạng phòng' })
   @ApiResponse({
     status: 200,
@@ -196,42 +197,42 @@ export class RoomTypesController {
   }
 
   @Patch(':id')
+  @Roles('OWNER', 'MANAGER')
   @UseInterceptors(UploadInterceptor('image'))
   @ApiOperation({
-    summary: 'Cập nhật thông tin hạng phòng (Chỉ dành cho OWNER)',
+    summary: 'Cập nhật thông tin hạng phòng (Chỉ dành cho OWNER và MANAGER)',
   })
   @ApiResponse({
     status: 200,
     description: 'Cập nhật hạng phòng thành công.',
   })
-  @ApiResponse({ status: 404, description: 'Hạng phòng không tồn tại.' })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ.' })
   @ApiResponse({ status: 403, description: 'Không có quyền thực hiện.' })
-  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 404, description: 'Hạng phòng không tồn tại.' })
   @ApiParam({ name: 'id', description: 'ID của hạng phòng' })
+  @ApiConsumes('multipart/form-data')
   async update(
     @Param('id') id: string,
     @Request() req: RequestWithUser,
     @Body() updateRoomTypeDto: UpdateRoomTypeDto,
     @UploadedFile() file?: Express.Multer.File,
   ): Promise<{ message: string; data: RoomType }> {
-    // Kiểm tra quyền OWNER
-    if (req.user.role !== 'OWNER') {
-      throw new ForbiddenException(
-        'Chỉ chủ khách sạn mới có quyền cập nhật hạng phòng',
-      );
-    }
-
     const objectId = new mongoose.Types.ObjectId(id);
     const roomType = await this.roomTypesService.findOne(objectId);
 
-    // Kiểm tra xem người dùng có phải là chủ của khách sạn này không
+    // Kiểm tra quyền truy cập
     const hotelId = roomType.hotelId.toString();
     const hotel = await this.hotelsService.findOne(hotelId);
 
     const ownerId = this.hotelsService.extractOwnerId(hotel);
-    if (ownerId !== req.user.userId) {
+    const isOwner = ownerId === req.user.userId;
+    const isManager =
+      req.user.role === 'MANAGER' &&
+      this.hotelsService.isUserStaffMember(hotel, req.user.userId);
+
+    if (!isOwner && !isManager) {
       throw new ForbiddenException(
-        'Bạn không có quyền cập nhật hạng phòng của khách sạn này',
+        'Bạn không có quyền cập nhật thông tin hạng phòng này',
       );
     }
 
@@ -253,36 +254,27 @@ export class RoomTypesController {
   }
 
   @Delete(':id')
+  @Roles('OWNER')
   @ApiOperation({ summary: 'Xóa hạng phòng (Chỉ dành cho OWNER)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Xóa hạng phòng thành công.',
-  })
-  @ApiResponse({ status: 404, description: 'Hạng phòng không tồn tại.' })
+  @ApiResponse({ status: 200, description: 'Xóa hạng phòng thành công.' })
   @ApiResponse({ status: 403, description: 'Không có quyền thực hiện.' })
+  @ApiResponse({ status: 404, description: 'Hạng phòng không tồn tại.' })
   @ApiParam({ name: 'id', description: 'ID của hạng phòng' })
   async remove(
     @Param('id') id: string,
     @Request() req: RequestWithUser,
   ): Promise<{ message: string }> {
-    // Kiểm tra quyền OWNER
-    if (req.user.role !== 'OWNER') {
-      throw new ForbiddenException(
-        'Chỉ chủ khách sạn mới có quyền xóa hạng phòng',
-      );
-    }
-
     const objectId = new mongoose.Types.ObjectId(id);
     const roomType = await this.roomTypesService.findOne(objectId);
 
-    // Kiểm tra xem người dùng có phải là chủ của khách sạn này không
+    // Kiểm tra quyền truy cập
     const hotelId = roomType.hotelId.toString();
     const hotel = await this.hotelsService.findOne(hotelId);
 
     const ownerId = this.hotelsService.extractOwnerId(hotel);
     if (ownerId !== req.user.userId) {
       throw new ForbiddenException(
-        'Bạn không có quyền xóa hạng phòng của khách sạn này',
+        'Chỉ chủ khách sạn mới có quyền xóa hạng phòng',
       );
     }
 
