@@ -13,6 +13,7 @@ import * as dayjs from 'dayjs';
 import { ActivateAccountDto } from '@/auth/dto/activate-account.dto';
 import { GoogleUserData } from './types/user.types';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
+import { UpdateEmployeeDto } from './dto/update-employee.dto';
 
 @Injectable()
 export class UsersService {
@@ -218,5 +219,102 @@ export class UsersService {
         _id: { $ne: user._id }, // Loại trừ người dùng hiện tại
       })
       .select('-password -verificationCode -codeExpires -resetToken');
+  }
+
+  async updateEmployee(
+    userId: string,
+    employeeId: string,
+    updateEmployeeDto: UpdateEmployeeDto,
+  ) {
+    // Kiểm tra người dùng hiện tại có phải là OWNER không
+    const owner = await this.findById(userId);
+    if (!owner || owner.role !== 'OWNER') {
+      throw new ForbiddenException('Bạn không có quyền cập nhật nhân viên');
+    }
+
+    // Kiểm tra nhân viên có tồn tại không
+    this.validateMongoId(employeeId);
+    const employee = await this.findById(employeeId);
+    if (!employee) {
+      throw new NotFoundException('Nhân viên không tồn tại');
+    }
+
+    // Kiểm tra xem owner có quản lý khách sạn của nhân viên này không
+    const isEmployeeOfOwner = employee.hotels.some((hotelId) =>
+      owner.hotels.some((ownerHotelId) => ownerHotelId.equals(hotelId)),
+    );
+
+    if (!isEmployeeOfOwner) {
+      throw new ForbiddenException(
+        'Bạn không có quyền cập nhật nhân viên này',
+      );
+    }
+
+    // Nếu cập nhật email, kiểm tra email mới không trùng với email hiện có
+    if (updateEmployeeDto.email && updateEmployeeDto.email !== employee.email) {
+      const existingUserWithEmail = await this.userModel
+        .findOne({ email: updateEmployeeDto.email })
+        .exec();
+      
+      if (existingUserWithEmail) {
+        throw new BadRequestException('Email đã được sử dụng bởi người dùng khác');
+      }
+    }
+
+    // Nếu có cập nhật mật khẩu, hash mật khẩu mới
+    if (updateEmployeeDto.password) {
+      updateEmployeeDto.password = await hashPassword(updateEmployeeDto.password);
+    }
+
+    // Cập nhật thông tin nhân viên
+    const updatedEmployee = await this.userModel.findByIdAndUpdate(
+      employeeId, 
+      updateEmployeeDto, 
+      { new: true }
+    ).select('-password -verificationCode -codeExpires -resetToken');
+
+    if (!updatedEmployee) {
+      throw new NotFoundException('Không thể cập nhật thông tin nhân viên');
+    }
+
+    return {
+      message: 'Cập nhật nhân viên thành công',
+      data: updatedEmployee,
+    };
+  }
+
+  async removeEmployee(userId: string, employeeId: string) {
+    // Kiểm tra người dùng hiện tại có phải là OWNER không
+    const owner = await this.findById(userId);
+    if (!owner || owner.role !== 'OWNER') {
+      throw new ForbiddenException('Bạn không có quyền xóa nhân viên');
+    }
+
+    // Kiểm tra nhân viên có tồn tại không
+    this.validateMongoId(employeeId);
+    const employee = await this.findById(employeeId);
+    if (!employee) {
+      throw new NotFoundException('Nhân viên không tồn tại');
+    }
+
+    // Kiểm tra xem owner có quản lý khách sạn của nhân viên này không
+    const isEmployeeOfOwner = employee.hotels.some((hotelId) =>
+      owner.hotels.some((ownerHotelId) => ownerHotelId.equals(hotelId)),
+    );
+
+    if (!isEmployeeOfOwner) {
+      throw new ForbiddenException('Bạn không có quyền xóa nhân viên này');
+    }
+
+    // Xóa nhân viên
+    const deletedEmployee = await this.userModel.findByIdAndDelete(employeeId);
+    
+    if (!deletedEmployee) {
+      throw new NotFoundException('Không thể xóa nhân viên');
+    }
+
+    return {
+      message: 'Xóa nhân viên thành công',
+    };
   }
 }
