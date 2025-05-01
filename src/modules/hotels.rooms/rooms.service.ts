@@ -124,7 +124,7 @@ export class RoomsService {
     const userIdObj = new mongoose.Types.ObjectId(userId);
     const logDto: CreateRoomStatusLogDto = {
       roomId: id,
-      status: updateStatusDto.status as RoomStatus,
+      status: updateStatusDto.status,
       previousStatus: previousStatus as RoomStatus,
       changedBy: userIdObj,
       note: updateStatusDto.note,

@@ -13,6 +13,7 @@ import {
   RoomStatusLogSchema,
 } from '../hotels.rooms/schemas/room-status-log.schema';
 import { RoomStatusLogsService } from '../hotels.rooms/room-status-logs.service';
+import { InventoryModule } from '../hotels.inventory/inventory.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { RoomStatusLogsService } from '../hotels.rooms/room-status-logs.service'
     RoomTypesModule,
     forwardRef(() => RoomsModule),
     BookingsModule,
+    InventoryModule,
   ],
   controllers: [HotelsController],
   providers: [HotelsService, RoomStatusLogsService],

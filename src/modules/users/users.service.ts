@@ -245,9 +245,7 @@ export class UsersService {
     );
 
     if (!isEmployeeOfOwner) {
-      throw new ForbiddenException(
-        'Bạn không có quyền cập nhật nhân viên này',
-      );
+      throw new ForbiddenException('Bạn không có quyền cập nhật nhân viên này');
     }
 
     // Nếu cập nhật email, kiểm tra email mới không trùng với email hiện có
@@ -255,23 +253,25 @@ export class UsersService {
       const existingUserWithEmail = await this.userModel
         .findOne({ email: updateEmployeeDto.email })
         .exec();
-      
+
       if (existingUserWithEmail) {
-        throw new BadRequestException('Email đã được sử dụng bởi người dùng khác');
+        throw new BadRequestException(
+          'Email đã được sử dụng bởi người dùng khác',
+        );
       }
     }
 
     // Nếu có cập nhật mật khẩu, hash mật khẩu mới
     if (updateEmployeeDto.password) {
-      updateEmployeeDto.password = await hashPassword(updateEmployeeDto.password);
+      updateEmployeeDto.password = await hashPassword(
+        updateEmployeeDto.password,
+      );
     }
 
     // Cập nhật thông tin nhân viên
-    const updatedEmployee = await this.userModel.findByIdAndUpdate(
-      employeeId, 
-      updateEmployeeDto, 
-      { new: true }
-    ).select('-password -verificationCode -codeExpires -resetToken');
+    const updatedEmployee = await this.userModel
+      .findByIdAndUpdate(employeeId, updateEmployeeDto, { new: true })
+      .select('-password -verificationCode -codeExpires -resetToken');
 
     if (!updatedEmployee) {
       throw new NotFoundException('Không thể cập nhật thông tin nhân viên');
@@ -308,7 +308,7 @@ export class UsersService {
 
     // Xóa nhân viên
     const deletedEmployee = await this.userModel.findByIdAndDelete(employeeId);
-    
+
     if (!deletedEmployee) {
       throw new NotFoundException('Không thể xóa nhân viên');
     }
