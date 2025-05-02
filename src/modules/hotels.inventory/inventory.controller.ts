@@ -200,21 +200,67 @@ export class InventoryController {
     return this.inventoryService.getSummary(hotelObjectId, threshold);
   }
 
-  @Get(':id')
+  @Get('search')
   @Roles('OWNER', 'MANAGER', 'RECEPTIONIST', 'HOUSEKEEPING', 'ACCOUNTANT')
-  @ApiOperation({ summary: 'Lấy thông tin chi tiết của một hàng hóa' })
+  @ApiOperation({ summary: 'Tìm kiếm hàng hóa theo mã hoặc tên' })
+  @ApiQuery({
+    name: 'hotelId',
+    description: 'ID của khách sạn',
+    required: true,
+  })
+  @ApiQuery({
+    name: 'query',
+    description: 'Từ khóa tìm kiếm (mã hoặc tên hàng hóa)',
+    required: true,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Trả về danh sách hàng hóa phù hợp với từ khóa tìm kiếm.',
+  })
+  async searchItems(
+    @Request() req: RequestWithUser,
+    @Query('hotelId') hotelId: string,
+    @Query('query') query: string,
+  ): Promise<InventoryItem[]> {
+    try {
+      // Kiểm tra quyền truy cập
+      const hotel = await this.hotelsService.findOne(hotelId);
+
+      const ownerId = this.hotelsService.extractOwnerId(hotel);
+      const isOwner = ownerId === req.user.userId;
+      const isStaff = this.hotelsService.isUserStaffMember(
+        hotel,
+        req.user.userId,
+      );
+
+      if (!isOwner && !isStaff) {
+        throw new ForbiddenException(
+          'Bạn không có quyền truy cập dữ liệu của khách sạn này',
+        );
+      }
+
+      // Gọi service để tìm kiếm - truyền thẳng hotelId dạng string để service xử lý
+      return this.inventoryService.searchItems(hotelId, query);
+    } catch (error) {
+      console.error('Search error:', error);
+      throw error;
+    }
+  }
+
+  @Get('code/:code')
+  @Roles('OWNER', 'MANAGER', 'RECEPTIONIST', 'HOUSEKEEPING', 'ACCOUNTANT')
+  @ApiOperation({ summary: 'Lấy thông tin chi tiết của một hàng hóa theo mã' })
   @ApiResponse({
     status: 200,
     description: 'Trả về thông tin hàng hóa.',
   })
   @ApiResponse({ status: 404, description: 'Hàng hóa không tồn tại.' })
-  @ApiParam({ name: 'id', description: 'ID của hàng hóa' })
-  async findOne(
-    @Param('id') id: string,
+  @ApiParam({ name: 'code', description: 'Mã hàng hóa' })
+  async findByCode(
+    @Param('code') code: string,
     @Request() req: RequestWithUser,
   ): Promise<InventoryItem> {
-    const objectId = new mongoose.Types.ObjectId(id);
-    const inventoryItem = await this.inventoryService.findOne(objectId);
+    const inventoryItem = await this.inventoryService.findByInventoryCode(code);
 
     // Kiểm tra quyền truy cập
     const hotelId = inventoryItem.hotelId.toString();
@@ -236,20 +282,21 @@ export class InventoryController {
     return inventoryItem;
   }
 
-  @Get('code/:code')
+  @Get(':id')
   @Roles('OWNER', 'MANAGER', 'RECEPTIONIST', 'HOUSEKEEPING', 'ACCOUNTANT')
-  @ApiOperation({ summary: 'Lấy thông tin chi tiết của một hàng hóa theo mã' })
+  @ApiOperation({ summary: 'Lấy thông tin chi tiết của một hàng hóa' })
   @ApiResponse({
     status: 200,
     description: 'Trả về thông tin hàng hóa.',
   })
   @ApiResponse({ status: 404, description: 'Hàng hóa không tồn tại.' })
-  @ApiParam({ name: 'code', description: 'Mã hàng hóa' })
-  async findByCode(
-    @Param('code') code: string,
+  @ApiParam({ name: 'id', description: 'ID của hàng hóa' })
+  async findOne(
+    @Param('id') id: string,
     @Request() req: RequestWithUser,
   ): Promise<InventoryItem> {
-    const inventoryItem = await this.inventoryService.findByInventoryCode(code);
+    const objectId = new mongoose.Types.ObjectId(id);
+    const inventoryItem = await this.inventoryService.findOne(objectId);
 
     // Kiểm tra quyền truy cập
     const hotelId = inventoryItem.hotelId.toString();

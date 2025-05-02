@@ -142,4 +142,26 @@ export class InventoryService {
 
     return deletedItem;
   }
+
+  async searchItems(
+    hotelId: mongoose.Types.ObjectId | string,
+    searchTerm: string,
+  ): Promise<InventoryItem[]> {
+    // Đảm bảo hotelId là một ObjectId hợp lệ
+    const hotelObjectId =
+      typeof hotelId === 'string'
+        ? new mongoose.Types.ObjectId(hotelId)
+        : hotelId;
+
+    // Tạo biểu thức tìm kiếm phù hợp với mã hàng hoặc tên hàng (không phân biệt chữ hoa/thường)
+    const searchRegex = new RegExp(searchTerm, 'i');
+
+    return this.inventoryItemModel
+      .find({
+        hotelId: hotelObjectId,
+        $or: [{ inventoryCode: searchRegex }, { name: searchRegex }],
+      })
+      .limit(20) // Giới hạn số lượng kết quả trả về để tránh quá tải
+      .exec();
+  }
 }
