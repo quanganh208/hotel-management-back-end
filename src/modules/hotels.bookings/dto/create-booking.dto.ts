@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsMongoId, IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsMongoId,
+  IsNotEmpty,
+  IsString,
+  IsNumber,
+  IsOptional,
+} from 'class-validator';
 
 export class CreateBookingDto {
   @ApiProperty({
@@ -12,7 +19,7 @@ export class CreateBookingDto {
 
   @ApiProperty({
     description: 'Ngày nhận phòng',
-    example: '2023-10-20',
+    example: '2023-10-20T14:00:00',
   })
   @IsNotEmpty()
   @IsDateString()
@@ -20,7 +27,7 @@ export class CreateBookingDto {
 
   @ApiProperty({
     description: 'Ngày trả phòng',
-    example: '2023-10-25',
+    example: '2023-10-25T12:00:00',
   })
   @IsNotEmpty()
   @IsDateString()
@@ -43,9 +50,29 @@ export class CreateBookingDto {
   phoneNumber: string;
 
   @ApiProperty({
+    description: 'Số lượng khách',
+    example: 2,
+    default: 1,
+  })
+  @IsNotEmpty()
+  @IsNumber()
+  guestCount: number;
+
+  @ApiProperty({
+    description: 'Ghi chú',
+    example: 'Khách yêu cầu thêm giường phụ',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @ApiProperty({
     description: 'ID người tạo (tự động thêm từ request)',
     example: '60d21b4667d0d8992e610c85',
     required: false,
   })
+  @IsOptional()
+  @IsMongoId()
   createdBy?: string;
 }

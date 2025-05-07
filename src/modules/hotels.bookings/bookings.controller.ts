@@ -140,6 +140,44 @@ export class BookingsController {
     return this.bookingsService.findByRoomId(roomObjectId);
   }
 
+  @Get('room/:roomId/latest')
+  @ApiOperation({ summary: 'Lấy đặt phòng mới nhất cho một phòng cụ thể' })
+  @ApiResponse({
+    status: 200,
+    description: 'Trả về thông tin đặt phòng mới nhất.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Không tìm thấy đặt phòng nào cho phòng này.',
+  })
+  async findLatestByRoomId(
+    @Param('roomId') roomId: string,
+    @Request() req: RequestWithUser,
+  ): Promise<Booking> {
+    // Kiểm tra xem phòng thuộc khách sạn nào
+    const roomObjectId = new mongoose.Types.ObjectId(roomId);
+    const room = await this.roomsService.findOne(roomObjectId);
+
+    const hotelId = room.hotelId.toString();
+    const hotel = await this.hotelsService.findOne(hotelId);
+
+    // Kiểm tra quyền dựa vào vai trò
+    const ownerId = this.hotelsService.extractOwnerId(hotel);
+    const isOwner = ownerId === req.user.userId;
+    const isStaff = this.hotelsService.isUserStaffMember(
+      hotel,
+      req.user.userId,
+    );
+
+    if (!isOwner && !isStaff) {
+      throw new ForbiddenException(
+        'Bạn không có quyền truy cập dữ liệu đặt phòng của khách sạn này',
+      );
+    }
+
+    return this.bookingsService.findLatestByRoomId(roomObjectId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Lấy thông tin chi tiết đặt phòng' })
   @ApiResponse({

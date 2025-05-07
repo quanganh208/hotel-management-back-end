@@ -57,6 +57,16 @@ export class User {
   @Prop()
   resetToken: string;
 
+  // 2FA fields
+  @Prop({ default: false })
+  isTwoFactorEnabled: boolean;
+
+  @Prop()
+  twoFactorSecret: string;
+
+  @Prop()
+  twoFactorBackupCodes: string[];
+
   @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Hotel' }] })
   hotels: mongoose.Types.ObjectId[];
 

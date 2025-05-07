@@ -1,10 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class UpdateBookingDto {
   @ApiProperty({
     description: 'Ngày nhận phòng',
-    example: '2023-10-20',
+    example: '2023-10-20T14:00:00',
     required: false,
   })
   @IsOptional()
@@ -13,7 +13,7 @@ export class UpdateBookingDto {
 
   @ApiProperty({
     description: 'Ngày trả phòng',
-    example: '2023-10-25',
+    example: '2023-10-25T12:00:00',
     required: false,
   })
   @IsOptional()
@@ -37,4 +37,22 @@ export class UpdateBookingDto {
   @IsOptional()
   @IsString()
   phoneNumber?: string;
+
+  @ApiProperty({
+    description: 'Số lượng khách',
+    example: 2,
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  guestCount?: number;
+
+  @ApiProperty({
+    description: 'Ghi chú',
+    example: 'Khách yêu cầu thêm giường phụ',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  note?: string;
 }

@@ -9,6 +9,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from '@/auth/passport/jwt-auth.guard';
 import { HotelsModule } from '@/modules/hotels/hotels.module';
 import { HelpersModule } from '@/helpers/helpers.module';
+import { PaymentModule } from './modules/hotels.payments/payment.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { HelpersModule } from '@/helpers/helpers.module';
     AuthModule,
     HotelsModule,
     HelpersModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [

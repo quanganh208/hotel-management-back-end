@@ -12,15 +12,26 @@ import {
   RoomStatusLog,
   RoomStatusLogSchema,
 } from './schemas/room-status-log.schema';
+import { BookingsModule } from '../hotels.bookings/bookings.module';
+import { InvoicesModule } from '../hotels.invoices/invoices.module';
+import {
+  Invoice,
+  InvoiceSchema,
+} from '../hotels.invoices/schemas/invoice.schema';
+import { PaymentModule } from '../hotels.payments/payment.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Room.name, schema: RoomSchema },
       { name: RoomStatusLog.name, schema: RoomStatusLogSchema },
+      { name: Invoice.name, schema: InvoiceSchema },
     ]),
     RoomTypesModule,
     forwardRef(() => HotelsModule),
+    forwardRef(() => BookingsModule),
+    forwardRef(() => InvoicesModule),
+    PaymentModule,
   ],
   controllers: [RoomsController, RoomStatusLogsController],
   providers: [RoomsService, SupabaseStorageService, RoomStatusLogsService],

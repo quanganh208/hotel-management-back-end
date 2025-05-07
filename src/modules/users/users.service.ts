@@ -14,10 +14,23 @@ import { ActivateAccountDto } from '@/auth/dto/activate-account.dto';
 import { GoogleUserData } from './types/user.types';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
+import { Hotel, HotelDocument } from '@/modules/hotels/schemas/hotel.schema';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import * as bcrypt from 'bcrypt';
+import {
+  generate2faSecret,
+  verify2faToken,
+  generateQRCodeDataURL,
+  generateBackupCodes,
+} from '@/helpers/util';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Hotel.name) private hotelModel: Model<HotelDocument>,
+  ) {}
 
   private async checkUserExists(email: string): Promise<void> {
     const isUserExist = await this.userModel.findOne({ email });
@@ -179,6 +192,11 @@ export class UsersService {
       note: createEmployeeDto.note,
     }).save();
 
+    // Cập nhật danh sách staff của khách sạn, thêm nhân viên mới vào
+    await this.hotelModel.findByIdAndUpdate(hotelObjectId, {
+      $push: { staff: newEmployee._id },
+    });
+
     return {
       message: 'Tạo nhân viên thành công',
       data: {
@@ -316,5 +334,218 @@ export class UsersService {
     return {
       message: 'Xóa nhân viên thành công',
     };
+  }
+
+  async updateUserProfile(userId: string, updateUserDto: UpdateUserDto) {
+    // Kiểm tra người dùng có tồn tại không
+    this.validateMongoId(userId);
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    // Nếu cập nhật email, kiểm tra email mới không trùng với email hiện có
+    if (updateUserDto.email && updateUserDto.email !== user.email) {
+      const existingUserWithEmail = await this.userModel
+        .findOne({ email: updateUserDto.email })
+        .exec();
+
+      if (existingUserWithEmail) {
+        throw new BadRequestException(
+          'Email đã được sử dụng bởi người dùng khác',
+        );
+      }
+    }
+
+    // Nếu có cập nhật mật khẩu, hash mật khẩu mới
+    if (updateUserDto.password) {
+      updateUserDto.password = await hashPassword(updateUserDto.password);
+    }
+
+    // Cập nhật thông tin người dùng
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(userId, updateUserDto, { new: true })
+      .select('-password -verificationCode -codeExpires -resetToken');
+
+    if (!updatedUser) {
+      throw new NotFoundException('Không thể cập nhật thông tin người dùng');
+    }
+
+    return {
+      message: 'Cập nhật thông tin thành công',
+      data: updatedUser,
+    };
+  }
+
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
+    // Kiểm tra người dùng có tồn tại không
+    this.validateMongoId(userId);
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    // Kiểm tra mật khẩu hiện tại có đúng không
+    if (!user.password) {
+      throw new BadRequestException('Tài khoản không sử dụng mật khẩu cục bộ');
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      changePasswordDto.currentPassword,
+      user.password,
+    );
+
+    if (!isPasswordValid) {
+      throw new BadRequestException('Mật khẩu hiện tại không đúng');
+    }
+
+    // Hash mật khẩu mới
+    const hashedNewPassword = await hashPassword(changePasswordDto.newPassword);
+
+    // Cập nhật mật khẩu mới
+    await this.userModel.findByIdAndUpdate(userId, {
+      password: hashedNewPassword,
+    });
+
+    return {
+      message: 'Đổi mật khẩu thành công',
+    };
+  }
+
+  async setup2fa(
+    userId: string,
+  ): Promise<{ otpAuthUrl: string; qrCodeUrl: string }> {
+    // Kiểm tra người dùng có tồn tại không
+    this.validateMongoId(userId);
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    // Kiểm tra xem 2FA đã được bật chưa
+    if (user.isTwoFactorEnabled) {
+      throw new BadRequestException('Xác thực hai yếu tố đã được bật');
+    }
+
+    // Tạo secret 2FA và lưu vào database (chưa kích hoạt)
+    const secret = generate2faSecret(user.email);
+
+    if (!secret.base32 || !secret.otpauth_url) {
+      throw new BadRequestException('Không thể tạo secret 2FA');
+    }
+
+    // Lưu secret vào database (chưa kích hoạt 2FA)
+    await this.userModel.findByIdAndUpdate(userId, {
+      twoFactorSecret: secret.base32,
+    });
+
+    // Tạo QR code để người dùng quét
+    const qrCodeUrl = await generateQRCodeDataURL(secret.otpauth_url);
+
+    return {
+      otpAuthUrl: secret.otpauth_url,
+      qrCodeUrl: qrCodeUrl,
+    };
+  }
+
+  async verify2fa(
+    userId: string,
+    code: string,
+  ): Promise<{ backupCodes: string[] }> {
+    // Kiểm tra người dùng có tồn tại không
+    this.validateMongoId(userId);
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    // Kiểm tra xem người dùng có secret 2FA không
+    if (!user.twoFactorSecret) {
+      throw new BadRequestException('Chưa thiết lập xác thực hai yếu tố');
+    }
+
+    // Kiểm tra xem 2FA đã được bật chưa
+    if (user.isTwoFactorEnabled) {
+      throw new BadRequestException('Xác thực hai yếu tố đã được bật');
+    }
+
+    // Xác thực mã
+    const isValid = verify2faToken(code, user.twoFactorSecret);
+    if (!isValid) {
+      throw new BadRequestException('Mã xác thực không hợp lệ');
+    }
+
+    // Tạo backup codes
+    const backupCodes = generateBackupCodes();
+
+    // Bật 2FA và lưu backup codes
+    await this.userModel.findByIdAndUpdate(userId, {
+      isTwoFactorEnabled: true,
+      twoFactorBackupCodes: backupCodes,
+    });
+
+    return { backupCodes };
+  }
+
+  async disable2fa(userId: string, code: string): Promise<{ message: string }> {
+    // Kiểm tra người dùng có tồn tại không
+    this.validateMongoId(userId);
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    // Kiểm tra xem 2FA đã được bật chưa
+    if (!user.isTwoFactorEnabled) {
+      throw new BadRequestException('Xác thực hai yếu tố chưa được bật');
+    }
+
+    // Xác thực mã
+    const isCodeValid = verify2faToken(code, user.twoFactorSecret);
+
+    // Nếu mã không hợp lệ, kiểm tra xem có phải là backup code không
+    if (!isCodeValid && !user.twoFactorBackupCodes.includes(code)) {
+      throw new BadRequestException('Mã xác thực không hợp lệ');
+    }
+
+    // Tắt 2FA
+    await this.userModel.findByIdAndUpdate(userId, {
+      isTwoFactorEnabled: false,
+      twoFactorSecret: null,
+      twoFactorBackupCodes: [],
+    });
+
+    return { message: 'Đã tắt xác thực hai yếu tố thành công' };
+  }
+
+  async validate2faCode(userId: string, code: string): Promise<boolean> {
+    // Kiểm tra người dùng có tồn tại không
+    this.validateMongoId(userId);
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+
+    // Kiểm tra xem 2FA đã được bật chưa
+    if (!user.isTwoFactorEnabled) {
+      return true; // 2FA chưa bật, không cần xác thực
+    }
+
+    // Xác thực mã
+    const isCodeValid = verify2faToken(code, user.twoFactorSecret);
+
+    // Nếu mã không hợp lệ, kiểm tra xem có phải là backup code không
+    if (!isCodeValid && !user.twoFactorBackupCodes.includes(code)) {
+      return false;
+    }
+
+    // Nếu đó là backup code, xóa backup code khỏi danh sách
+    if (!isCodeValid && user.twoFactorBackupCodes.includes(code)) {
+      await this.userModel.findByIdAndUpdate(userId, {
+        $pull: { twoFactorBackupCodes: code },
+      });
+    }
+
+    return true;
   }
 }

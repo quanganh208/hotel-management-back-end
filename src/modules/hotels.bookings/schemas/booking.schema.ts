@@ -20,6 +20,12 @@ export class Booking {
   @Prop({ required: true })
   phoneNumber: string;
 
+  @Prop({ required: true, default: 1 })
+  guestCount: number;
+
+  @Prop({ required: false })
+  note?: string;
+
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   createdBy: mongoose.Types.ObjectId;
 }

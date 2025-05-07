@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { BookingsController } from './bookings.controller';
 import { BookingsService } from './bookings.service';
@@ -19,6 +19,8 @@ import {
   RoomStatusLog,
   RoomStatusLogSchema,
 } from '../hotels.rooms/schemas/room-status-log.schema';
+import { RoomsModule } from '../hotels.rooms/rooms.module';
+import { InvoicesModule } from '../hotels.invoices/invoices.module';
 
 @Module({
   imports: [
@@ -31,11 +33,12 @@ import {
       { name: RoomStatusLog.name, schema: RoomStatusLogSchema },
     ]),
     RoomTypesModule,
+    forwardRef(() => RoomsModule),
+    forwardRef(() => InvoicesModule),
   ],
   controllers: [BookingsController],
   providers: [
     BookingsService,
-    RoomsService,
     HotelsService,
     RoomTypesService,
     RoomStatusLogsService,

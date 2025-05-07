@@ -54,6 +54,21 @@ export class BookingsService {
       .exec();
   }
 
+  async findLatestByRoomId(roomId: Types.ObjectId): Promise<Booking> {
+    const booking = await this.bookingModel
+      .findOne({ roomId })
+      .sort({ createdAt: -1 })
+      .populate('roomId', 'roomNumber floor')
+      .populate('createdBy', 'name email')
+      .exec();
+
+    if (!booking) {
+      throw new NotFoundException('Không tìm thấy đặt phòng nào cho phòng này');
+    }
+
+    return booking;
+  }
+
   async findOne(id: Types.ObjectId): Promise<Booking> {
     const booking = await this.bookingModel
       .findById(id)

@@ -14,6 +14,8 @@ import {
   UseInterceptors,
   forwardRef,
   UseGuards,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { CreateRoomDto } from './dto/create-room.dto';
@@ -37,6 +39,10 @@ import { UpdateRoomStatusWithNoteDto } from './dto/update-room-status-with-note.
 import { JwtAuthGuard } from '@/auth/passport/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/roles.guard';
 import { Roles } from '@/decorator/roles.decorator';
+import { CheckInRoomDto } from './dto/check-in-room.dto';
+import { WalkInCheckInDto } from './dto/walk-in-check-in.dto';
+import { PaymentService } from '../hotels.payments/payment.service';
+import { InvoicesService } from '../hotels.invoices/invoices.service';
 
 @ApiTags('rooms')
 @ApiBearerAuth()
@@ -48,6 +54,8 @@ export class RoomsController {
     private readonly supabaseStorageService: SupabaseStorageService,
     @Inject(forwardRef(() => HotelsService))
     private readonly hotelsService: HotelsService,
+    private readonly paymentService: PaymentService,
+    private readonly invoicesService: InvoicesService,
   ) {}
 
   @Post()
@@ -363,6 +371,205 @@ export class RoomsController {
     );
     return {
       message: 'Cập nhật trạng thái phòng thành công',
+      data: updatedRoom,
+    };
+  }
+
+  @Patch(':id/check-in')
+  @Roles('OWNER', 'MANAGER', 'RECEPTIONIST')
+  @ApiOperation({
+    summary:
+      'Đánh dấu phòng đã được nhận (check-in) bởi khách hàng (OWNER, MANAGER, RECEPTIONIST)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật trạng thái nhận phòng thành công.',
+  })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ.' })
+  @ApiResponse({ status: 403, description: 'Không có quyền thực hiện.' })
+  @ApiResponse({ status: 404, description: 'Phòng không tồn tại.' })
+  @ApiParam({ name: 'id', description: 'ID của phòng' })
+  async checkInRoom(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+    @Body() checkInRoomDto: CheckInRoomDto,
+  ): Promise<{ message: string; data: Room }> {
+    const objectId = new mongoose.Types.ObjectId(id);
+    const room = await this.roomsService.findOne(objectId);
+
+    // Kiểm tra quyền truy cập
+    const hotelId = room.hotelId.toString();
+    const hotel = await this.hotelsService.findOne(hotelId);
+
+    const ownerId = this.hotelsService.extractOwnerId(hotel);
+    const isOwner = ownerId === req.user.userId;
+    const isEligibleStaff =
+      ['MANAGER', 'RECEPTIONIST'].includes(req.user.role) &&
+      this.hotelsService.isUserStaffMember(hotel, req.user.userId);
+
+    if (!isOwner && !isEligibleStaff) {
+      throw new ForbiddenException(
+        'Bạn không có quyền thực hiện việc nhận phòng này',
+      );
+    }
+
+    const updatedRoom = await this.roomsService.checkInRoom(
+      objectId,
+      checkInRoomDto,
+      req.user.userId,
+    );
+
+    return {
+      message: 'Cập nhật trạng thái nhận phòng thành công',
+      data: updatedRoom,
+    };
+  }
+
+  @Post(':id/walk-in-check-in')
+  @Roles('OWNER', 'MANAGER', 'RECEPTIONIST')
+  @ApiOperation({
+    summary: 'Nhận phòng cho khách vãng lai không có đặt phòng trước',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Nhận phòng thành công cho khách vãng lai.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Dữ liệu không hợp lệ hoặc phòng không khả dụng.',
+  })
+  @ApiResponse({ status: 403, description: 'Không có quyền thực hiện.' })
+  @ApiResponse({ status: 404, description: 'Phòng không tồn tại.' })
+  @ApiParam({ name: 'id', description: 'ID của phòng' })
+  async walkInCheckIn(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+    @Body() walkInCheckInDto: WalkInCheckInDto,
+  ): Promise<{ message: string; data: { room: Room; booking: any } }> {
+    const objectId = new mongoose.Types.ObjectId(id);
+    const room = await this.roomsService.findOne(objectId);
+
+    // Kiểm tra quyền truy cập
+    const hotelId = room.hotelId.toString();
+    const hotel = await this.hotelsService.findOne(hotelId);
+
+    const ownerId = this.hotelsService.extractOwnerId(hotel);
+    const isOwner = ownerId === req.user.userId;
+    const isEligibleStaff =
+      ['MANAGER', 'RECEPTIONIST'].includes(req.user.role) &&
+      this.hotelsService.isUserStaffMember(hotel, req.user.userId);
+
+    if (!isOwner && !isEligibleStaff) {
+      throw new ForbiddenException(
+        'Bạn không có quyền thực hiện việc nhận phòng cho khách vãng lai',
+      );
+    }
+
+    const result = await this.roomsService.walkInCheckIn(
+      objectId,
+      walkInCheckInDto,
+      req.user.userId,
+    );
+
+    return {
+      message: 'Nhận phòng thành công cho khách vãng lai',
+      data: result,
+    };
+  }
+
+  @Post(':id/checkout')
+  @Roles('OWNER', 'MANAGER', 'RECEPTIONIST')
+  @ApiOperation({
+    summary: 'Trả phòng và thanh toán hóa đơn (OWNER, MANAGER, RECEPTIONIST)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Trả phòng và thanh toán hóa đơn thành công.',
+  })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ.' })
+  @ApiResponse({ status: 403, description: 'Không có quyền thực hiện.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Phòng không tồn tại hoặc không ở trạng thái đang sử dụng.',
+  })
+  @ApiParam({ name: 'id', description: 'ID của phòng' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['paymentMethod'],
+      properties: {
+        paymentMethod: {
+          type: 'string',
+          enum: ['CASH', 'BANK_TRANSFER'],
+          description:
+            'Phương thức thanh toán: CASH (Tiền mặt) hoặc BANK_TRANSFER (Chuyển khoản)',
+        },
+        transactionReference: {
+          type: 'string',
+          description:
+            'Mã giao dịch/tham chiếu (bắt buộc khi thanh toán bằng chuyển khoản)',
+        },
+        note: {
+          type: 'string',
+          description: 'Ghi chú thanh toán (tùy chọn)',
+        },
+      },
+    },
+  })
+  async checkOutRoom(
+    @Param('id') id: string,
+    @Request() req: RequestWithUser,
+    @Body()
+    checkoutDto: {
+      paymentMethod: 'CASH' | 'BANK_TRANSFER';
+      transactionReference?: string;
+      note?: string;
+    },
+  ): Promise<any> {
+    const objectId = new mongoose.Types.ObjectId(id);
+    const room = await this.roomsService.findOne(objectId);
+
+    // Kiểm tra quyền truy cập
+    const hotelId = room.hotelId.toString();
+    const hotel = await this.hotelsService.findOne(hotelId);
+
+    const ownerId = this.hotelsService.extractOwnerId(hotel);
+    const isOwner = ownerId === req.user.userId;
+    const isEligibleStaff =
+      ['MANAGER', 'RECEPTIONIST'].includes(req.user.role) &&
+      this.hotelsService.isUserStaffMember(hotel, req.user.userId);
+
+    if (!isOwner && !isEligibleStaff) {
+      throw new ForbiddenException(
+        'Bạn không có quyền thực hiện việc trả phòng này',
+      );
+    }
+
+    // Kiểm tra thông tin thanh toán
+    if (
+      checkoutDto.paymentMethod === 'BANK_TRANSFER' &&
+      !checkoutDto.transactionReference
+    ) {
+      throw new BadRequestException(
+        'Vui lòng cung cấp mã giao dịch/tham chiếu cho thanh toán chuyển khoản',
+      );
+    }
+
+    // Tạo thông tin thanh toán
+    const paymentInfo = {
+      method: checkoutDto.paymentMethod,
+      reference: checkoutDto.transactionReference || '',
+      note: checkoutDto.note || '',
+    };
+
+    const updatedRoom = await this.roomsService.checkOutRoom(
+      objectId,
+      JSON.stringify(paymentInfo),
+      req.user.userId,
+    );
+
+    return {
+      message: 'Trả phòng và thanh toán hóa đơn thành công',
       data: updatedRoom,
     };
   }

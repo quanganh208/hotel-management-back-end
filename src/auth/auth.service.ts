@@ -14,6 +14,7 @@ import { SendActivationDto } from './dto/send-activation.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
+import { Authenticate2faDto } from './dto/2fa/authenticate-2fa.dto';
 import * as dayjs from 'dayjs';
 import { MailerService } from '@nestjs-modules/mailer';
 import { OAuth2Client } from 'google-auth-library';
@@ -35,13 +36,23 @@ export class AuthService {
     return user;
   }
 
-  login(user: UserDocument) {
+  login(user: UserDocument, isTwoFactorAuthenticated: boolean = false) {
+    // Kiểm tra nếu người dùng có bật 2FA nhưng chưa xác thực 2FA
+    if (user.isTwoFactorEnabled && !isTwoFactorAuthenticated) {
+      return {
+        message: 'Yêu cầu xác thực hai yếu tố',
+        requiresTwoFactor: true,
+        userId: user._id,
+      };
+    }
+
     const payload = {
       sub: user._id,
       email: user.email,
       name: user.name,
       accountType: user.accountType,
       role: user.role,
+      isTwoFactorEnabled: user.isTwoFactorEnabled,
     };
     return {
       message: 'Đăng nhập thành công',
@@ -54,7 +65,34 @@ export class AuthService {
       role: user.role,
       accountType: user.accountType,
       image: user.image,
+      isTwoFactorEnabled: user.isTwoFactorEnabled,
     };
+  }
+
+  async authenticate2fa(
+    userId: string,
+    authenticate2faDto: Authenticate2faDto,
+  ) {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new BadRequestException('Người dùng không tồn tại');
+    }
+
+    if (!user.isTwoFactorEnabled) {
+      throw new BadRequestException('Người dùng chưa bật xác thực hai yếu tố');
+    }
+
+    const isValid = await this.usersService.validate2faCode(
+      userId,
+      authenticate2faDto.code,
+    );
+
+    if (!isValid) {
+      throw new BadRequestException('Mã xác thực không hợp lệ');
+    }
+
+    // Đăng nhập người dùng với xác thực 2FA
+    return this.login(user, true);
   }
 
   async register(registerDto: RegisterDto) {
@@ -247,5 +285,18 @@ export class AuthService {
       console.error('Lỗi xác thực Google ID token:', error);
       return null;
     }
+  }
+
+  // 2FA methods
+  async setup2fa(userId: string) {
+    return this.usersService.setup2fa(userId);
+  }
+
+  async verify2fa(userId: string, code: string) {
+    return this.usersService.verify2fa(userId, code);
+  }
+
+  async disable2fa(userId: string, code: string) {
+    return this.usersService.disable2fa(userId, code);
   }
 }

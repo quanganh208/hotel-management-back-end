@@ -18,6 +18,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     name: string;
     accountType: string;
     role: string;
+    isTwoFactorEnabled: boolean;
   }) {
     return {
       userId: payload.sub,
@@ -25,6 +26,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       name: payload.name,
       accountType: payload.accountType,
       role: payload.role,
+      isTwoFactorEnabled: payload.isTwoFactorEnabled,
     };
   }
 }

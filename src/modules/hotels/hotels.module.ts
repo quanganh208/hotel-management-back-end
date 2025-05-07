@@ -14,7 +14,7 @@ import {
 } from '../hotels.rooms/schemas/room-status-log.schema';
 import { RoomStatusLogsService } from '../hotels.rooms/room-status-logs.service';
 import { InventoryModule } from '../hotels.inventory/inventory.module';
-
+import { InvoicesModule } from '../hotels.invoices/invoices.module';
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -27,6 +27,7 @@ import { InventoryModule } from '../hotels.inventory/inventory.module';
     forwardRef(() => RoomsModule),
     BookingsModule,
     InventoryModule,
+    InvoicesModule,
   ],
   controllers: [HotelsController],
   providers: [HotelsService, RoomStatusLogsService],
