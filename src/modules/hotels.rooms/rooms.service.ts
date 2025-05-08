@@ -20,6 +20,7 @@ import {
   InvoiceDocument,
 } from '../hotels.invoices/schemas/invoice.schema';
 import { ItemType } from '../hotels.invoices/schemas/invoice.schema';
+import { BookingStatus } from '../hotels.bookings/schemas/booking.schema';
 
 @Injectable()
 export class RoomsService {
@@ -188,7 +189,7 @@ export class RoomsService {
     let checkOutDate: Date | undefined;
     let bookingId: mongoose.Types.ObjectId | undefined;
 
-    // If there's a booking, get guest info from it
+    // If there's a booking, get guest info from it and update booking status
     if (checkInDto.bookingId) {
       try {
         const bookingObjectId = new mongoose.Types.ObjectId(
@@ -201,6 +202,11 @@ export class RoomsService {
           checkInDate = booking.checkInDate;
           checkOutDate = booking.checkOutDate;
           bookingId = bookingObjectId;
+
+          // Cập nhật trạng thái booking thành CHECKED_IN
+          await this.bookingsService.update(bookingObjectId, {
+            status: BookingStatus.CHECKED_IN,
+          });
         }
       } catch (error) {
         console.error('Error fetching booking for invoice creation:', error);
@@ -327,6 +333,7 @@ export class RoomsService {
         ? `Khách vãng lai: ${walkInDto.note}`
         : 'Khách vãng lai nhận phòng trực tiếp',
       createdBy: userId,
+      status: BookingStatus.CHECKED_IN, // Đặt trạng thái là CHECKED_IN ngay khi tạo booking cho khách vãng lai
     };
 
     // Create the booking
@@ -507,6 +514,16 @@ export class RoomsService {
 
         if (invoiceId) {
           await this.invoicesService.checkout(invoiceId, paymentMethod, userId);
+        }
+
+        // Nếu có booking liên quan, cập nhật trạng thái booking thành CHECKED_OUT
+        if (invoice.bookingId) {
+          const bookingId = new mongoose.Types.ObjectId(
+            invoice.bookingId.toString(),
+          );
+          await this.bookingsService.update(bookingId, {
+            status: BookingStatus.CHECKED_OUT,
+          });
         }
       }
     } catch (error) {

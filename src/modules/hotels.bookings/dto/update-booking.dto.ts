@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsNumber, IsOptional, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+import { BookingStatus } from '../schemas/booking.schema';
 
 export class UpdateBookingDto {
   @ApiProperty({
@@ -55,4 +62,14 @@ export class UpdateBookingDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @ApiProperty({
+    description: 'Trạng thái đặt phòng',
+    enum: BookingStatus,
+    example: BookingStatus.CHECKED_IN,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(BookingStatus)
+  status?: BookingStatus;
 }

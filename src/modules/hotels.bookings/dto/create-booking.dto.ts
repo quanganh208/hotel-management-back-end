@@ -6,7 +6,9 @@ import {
   IsString,
   IsNumber,
   IsOptional,
+  IsEnum,
 } from 'class-validator';
+import { BookingStatus } from '../schemas/booking.schema';
 
 export class CreateBookingDto {
   @ApiProperty({
@@ -66,6 +68,16 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @ApiProperty({
+    description: 'Trạng thái đặt phòng',
+    enum: BookingStatus,
+    example: BookingStatus.PENDING,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(BookingStatus)
+  status?: BookingStatus;
 
   @ApiProperty({
     description: 'ID người tạo (tự động thêm từ request)',

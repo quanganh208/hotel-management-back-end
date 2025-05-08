@@ -5,6 +5,7 @@ import { Booking, BookingDocument } from './schemas/booking.schema';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { Room, RoomDocument } from '../hotels.rooms/schemas/room.schema';
+import { BookingStatus } from './schemas/booking.schema';
 
 @Injectable()
 export class BookingsService {
@@ -20,6 +21,7 @@ export class BookingsService {
       createdBy: new Types.ObjectId(createBookingDto.createdBy),
       checkInDate: new Date(createBookingDto.checkInDate),
       checkOutDate: new Date(createBookingDto.checkOutDate),
+      status: createBookingDto.status || BookingStatus.PENDING,
     });
 
     const savedBooking = await booking.save();
@@ -143,5 +145,31 @@ export class BookingsService {
     }
 
     return deletedBooking;
+  }
+
+  async searchBookings(
+    hotelId: Types.ObjectId,
+    searchTerm: string,
+  ): Promise<Booking[]> {
+    // Tìm tất cả các phòng thuộc khách sạn
+    const rooms = await this.roomModel.find({ hotelId }).exec();
+    const roomIds = rooms.map((room) => room._id);
+
+    // Tìm tất cả các đặt phòng có roomId nằm trong danh sách phòng của khách sạn
+    // và thông tin khách hàng phù hợp với từ khóa tìm kiếm
+    // và chỉ lấy các booking có trạng thái PENDING (chưa nhận phòng)
+    return this.bookingModel
+      .find({
+        roomId: { $in: roomIds },
+        status: BookingStatus.PENDING,
+        $or: [
+          { guestName: { $regex: searchTerm, $options: 'i' } },
+          { phoneNumber: { $regex: searchTerm, $options: 'i' } },
+          { note: { $regex: searchTerm, $options: 'i' } },
+        ],
+      })
+      .populate('roomId', 'roomNumber floor')
+      .populate('createdBy', 'name email')
+      .exec();
   }
 }
