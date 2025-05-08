@@ -5,6 +5,7 @@ import { Hotel, HotelDocument } from './schemas/hotel.schema';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { PopulatedHotel, PopulatedUser } from '@/types/mongoose.types';
+import { hashPassword } from '@/helpers/util';
 
 // Type guard để kiểm tra đối tượng có _id
 function hasMongoId(obj: unknown): obj is { _id: Types.ObjectId | string } {
@@ -66,26 +67,73 @@ export class HotelsService {
       throw new NotFoundException('Người dùng không tồn tại');
     }
 
+    // Tạo nhân viên ChatBot AI tự động
+    const chatbotUser = await this.createChatbotUser(createHotelDto.name);
+
+    // Thêm chatbot vào danh sách nhân viên
+    const staffList = createHotelDto.staff || [];
+    staffList.push(chatbotUser._id.toString());
+
     const newHotel = new this.hotelModel({
       ...createHotelDto,
       owner: userId,
-      staff: createHotelDto.staff || [],
+      staff: staffList,
     });
 
     const savedHotel = await newHotel.save();
+
+    // Cập nhật thông tin khách sạn cho chatbot
+    await this.userModel.findByIdAndUpdate(chatbotUser._id, {
+      $push: { hotels: savedHotel._id },
+    });
 
     await this.userModel.findByIdAndUpdate(userId, {
       $push: { hotels: savedHotel._id },
     });
 
-    if (createHotelDto.staff && createHotelDto.staff.length > 0) {
+    if (staffList.length > 0) {
       await this.userModel.updateMany(
-        { _id: { $in: createHotelDto.staff } },
+        { _id: { $in: staffList } },
         { $push: { hotels: savedHotel._id } },
       );
     }
 
     return savedHotel;
+  }
+
+  // Tạo tài khoản ChatBot AI
+  private async createChatbotUser(hotelName: string): Promise<UserDocument> {
+    // Kiểm tra xem đã có chatbot chưa
+    const existingChatbot = await this.userModel.findOne({
+      email: 'chatbot@gmail.com',
+      name: 'ChatBot AI',
+    });
+
+    if (existingChatbot) {
+      return existingChatbot;
+    }
+
+    // Tạo mật khẩu ngẫu nhiên cho chatbot
+    const password = Math.random().toString(36).slice(-10);
+    const hashedPassword = await hashPassword(password);
+
+    // Tạo mã nhân viên cho chatbot
+    const employeeCode = 'AI000001';
+
+    // Tạo tài khoản chatbot
+    const chatbot = new this.userModel({
+      email: 'chatbot@gmail.com',
+      password: hashedPassword,
+      name: 'ChatBot AI',
+      role: 'RECEPTIONIST',
+      isVerified: true,
+      accountType: 'LOCAL',
+      employeeCode: employeeCode,
+      note: `Trợ lý ảo tự động tạo cho khách sạn ${hotelName}`,
+      image: 'https://cdn-icons-png.flaticon.com/512/4712/4712027.png',
+    });
+
+    return await chatbot.save();
   }
 
   // Hàm helper để chuyển đổi document thành PopulatedHotel an toàn

@@ -3,6 +3,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { chatbotSwaggerConfig } from './modules/chatbot/swagger-docs';
+import { ChatbotModule } from './modules/chatbot/chatbot.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -34,6 +36,16 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
+
+  // Cấu hình Swagger cho API
+  const swaggerDocument = SwaggerModule.createDocument(
+    app,
+    chatbotSwaggerConfig,
+    {
+      include: [ChatbotModule],
+    },
+  );
+  SwaggerModule.setup('api/docs/chatbot', app, swaggerDocument);
 
   app.useGlobalPipes(
     new ValidationPipe({

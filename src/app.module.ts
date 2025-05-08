@@ -11,6 +11,7 @@ import { HotelsModule } from '@/modules/hotels/hotels.module';
 import { HelpersModule } from '@/helpers/helpers.module';
 import { PaymentModule } from './modules/hotels.payments/payment.module';
 import { DashboardModule } from './modules/hotels.dashboard/dashboard.module';
+import { ChatbotModule } from './modules/chatbot/chatbot.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { DashboardModule } from './modules/hotels.dashboard/dashboard.module';
     HelpersModule,
     PaymentModule,
     DashboardModule,
+    ChatbotModule,
   ],
   controllers: [AppController],
   providers: [
