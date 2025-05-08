@@ -35,6 +35,6 @@ import { PaymentModule } from '../hotels.payments/payment.module';
   ],
   controllers: [RoomsController, RoomStatusLogsController],
   providers: [RoomsService, SupabaseStorageService, RoomStatusLogsService],
-  exports: [RoomsService],
+  exports: [RoomsService, RoomStatusLogsService],
 })
 export class RoomsModule {}

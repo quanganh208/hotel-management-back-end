@@ -299,4 +299,15 @@ export class AuthService {
   async disable2fa(userId: string, code: string) {
     return this.usersService.disable2fa(userId, code);
   }
+
+  async check2faStatus(userId: string) {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new BadRequestException('Người dùng không tồn tại');
+    }
+
+    return {
+      isTwoFactorEnabled: user.isTwoFactorEnabled,
+    };
+  }
 }

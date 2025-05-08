@@ -1,4 +1,4 @@
-import { Controller, Post, UseGuards, Req, Body } from '@nestjs/common';
+import { Controller, Post, UseGuards, Req, Body, Get } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Request } from 'express';
 import { LocalAuthGuard } from '@/auth/passport/local-auth.guard';
@@ -245,5 +245,28 @@ export class AuthController {
     @Body() disable2faDto: Disable2faDto,
   ) {
     return this.authService.disable2fa(req.user.userId, disable2faDto.code);
+  }
+
+  @Get('2fa/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Kiểm tra trạng thái xác thực hai yếu tố' })
+  @ApiResponse({
+    status: 200,
+    description: 'Trả về trạng thái 2FA của người dùng.',
+    schema: {
+      type: 'object',
+      properties: {
+        isTwoFactorEnabled: {
+          type: 'boolean',
+          example: true,
+          description: 'Trạng thái bật/tắt của xác thực hai yếu tố',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Không được phép truy cập.' })
+  get2faStatus(@Req() req: RequestWithUser) {
+    return this.authService.check2faStatus(req.user.userId);
   }
 }
