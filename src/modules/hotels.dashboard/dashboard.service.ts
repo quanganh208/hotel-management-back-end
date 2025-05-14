@@ -8,6 +8,7 @@ import { InventoryService } from '../hotels.inventory/inventory.service';
 import { RoomStatusLogsService } from '../hotels.rooms/room-status-logs.service';
 import mongoose from 'mongoose';
 import { Invoice } from '../hotels.invoices/schemas/invoice.schema';
+import { RoomStatus } from '../hotels.rooms/schemas/room.schema';
 
 @Injectable()
 export class DashboardService {
@@ -87,21 +88,32 @@ export class DashboardService {
 
     // Phân loại phòng theo trạng thái
     const roomsByStatus = {
-      VACANT_CLEAN: 0,
-      VACANT_DIRTY: 0,
-      OCCUPIED: 0,
-      OUT_OF_SERVICE: 0,
-      RESERVED: 0,
-      MAINTENANCE: 0,
+      [RoomStatus.AVAILABLE]: 0,
+      [RoomStatus.OCCUPIED]: 0,
+      [RoomStatus.BOOKED]: 0,
+      [RoomStatus.CHECKED_IN]: 0,
+      [RoomStatus.CHECKED_OUT]: 0,
+      [RoomStatus.CLEANING]: 0,
+      [RoomStatus.MAINTENANCE]: 0,
+      [RoomStatus.OUT_OF_SERVICE]: 0,
+      [RoomStatus.RESERVED]: 0,
     };
 
     rooms.forEach((room) => {
-      roomsByStatus[room.status] = (roomsByStatus[room.status] || 0) + 1;
+      if (roomsByStatus[room.status] !== undefined) {
+        roomsByStatus[room.status]++;
+      } else {
+        // Xử lý trường hợp status không nằm trong enum
+        roomsByStatus['unknown'] = (roomsByStatus['unknown'] || 0) + 1;
+      }
     });
 
     // Tính tỷ lệ lấp đầy (Occupancy rate)
+    // Phòng lấp đầy bao gồm: Đang có khách ở (OCCUPIED) và Khách đã nhận phòng (CHECKED_IN)
     const totalRooms = rooms.length;
-    const occupiedRooms = roomsByStatus.OCCUPIED || 0;
+    const occupiedRooms =
+      (roomsByStatus[RoomStatus.OCCUPIED] || 0) +
+      (roomsByStatus[RoomStatus.CHECKED_IN] || 0);
     const occupancyRate =
       totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0;
 
