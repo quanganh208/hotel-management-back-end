@@ -115,7 +115,9 @@ export class DashboardService {
       (roomsByStatus[RoomStatus.OCCUPIED] || 0) +
       (roomsByStatus[RoomStatus.CHECKED_IN] || 0);
     const occupancyRate =
-      totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0;
+      totalRooms > 0
+        ? Number(((occupiedRooms / totalRooms) * 100).toFixed(2))
+        : 0;
 
     // Lấy lịch sử thay đổi trạng thái phòng (10 bản ghi gần nhất)
     const recentStatusChanges = await this.roomStatusLogsService.findByHotelId(
